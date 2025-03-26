@@ -20,20 +20,20 @@
 """Models module of the Wordcab Transcribe."""
 
 from enum import Enum
-from typing import List, Literal, NamedTuple, Optional, Union
+from typing import ClassVar, Literal, NamedTuple
 
+import numpy as np
 from faster_whisper.transcribe import Segment
 from pydantic import BaseModel, HttpUrl, field_validator
-from tensorshare import TensorShare
 
 
 class ProcessTimes(BaseModel):
     """The execution times of the different processes."""
 
-    total: Union[float, None] = None
-    transcription: Union[float, None] = None
-    diarization: Union[float, None] = None
-    post_processing: Union[float, None] = None
+    total: float | None = None
+    transcription: float | None = None
+    diarization: float | None = None
+    post_processing: float | None = None
 
 
 class Timestamps(str, Enum):
@@ -59,7 +59,7 @@ class MultiChannelSegment(NamedTuple):
     start: float
     end: float
     text: str
-    words: List[Word]
+    words: list[Word]
     speaker: int
 
 
@@ -67,24 +67,24 @@ class Utterance(BaseModel):
     """Utterance model for the API."""
 
     text: str
-    start: Union[float, str]
-    end: Union[float, str]
-    speaker: Union[int, None] = None
-    words: Union[List[Word], None] = None
+    start: float | str
+    end: float | str
+    speaker: int | None = None
+    words: list[Word] | None = None
 
 
 class BaseResponse(BaseModel):
     """Base response model, not meant to be used directly."""
 
-    utterances: List[Utterance]
+    utterances: list[Utterance]
     audio_duration: float
-    offset_start: Union[float, None]
-    offset_end: Union[float, None]
+    offset_start: float | None
+    offset_end: float | None
     num_speakers: int
     diarization: bool
     source_lang: str
     timestamps: str
-    vocab: Union[List[str], None]
+    vocab: list[str] | None
     word_timestamps: bool
     internal_vad: bool
     repetition_penalty: float
@@ -93,8 +93,8 @@ class BaseResponse(BaseModel):
     no_speech_threshold: float
     condition_on_previous_text: bool
     process_times: ProcessTimes
-    job_name: Optional[str] = None
-    task_token: Optional[str] = None
+    job_name: str | None = None
+    task_token: str | None = None
 
 
 class AudioResponse(BaseResponse):
@@ -105,7 +105,7 @@ class AudioResponse(BaseResponse):
     class Config:
         """Pydantic config class."""
 
-        json_schema_extra = {
+        json_schema_extra: ClassVar[dict] = {
             "example": {
                 "utterances": [
                     {
@@ -148,22 +148,22 @@ class AudioResponse(BaseResponse):
                     "post_processing": 0.239,
                 },
                 "multi_channel": False,
-            }
+            },
         }
 
 
 class BaseRequest(BaseModel):
     """Base request model for the API."""
 
-    offset_start: Union[float, None] = None
-    offset_end: Union[float, None] = None
+    offset_start: float | None = None
+    offset_end: float | None = None
     num_speakers: int = -1
     diarization: bool = False
     batch_size: int = 1
     source_lang: str = "en"
     num_beams: int = 1
     timestamps: Timestamps = Timestamps.seconds
-    vocab: Union[List[str], None] = None
+    vocab: list[str] | None = None
     word_timestamps: bool = False
     internal_vad: bool = False
     repetition_penalty: float = 1.2
@@ -171,26 +171,24 @@ class BaseRequest(BaseModel):
     log_prob_threshold: float = -1.0
     no_speech_threshold: float = 0.6
     condition_on_previous_text: bool = True
-    job_name: Optional[str] = None
-    task_token: Optional[str] = None
+    job_name: str | None = None
+    task_token: str | None = None
 
     @field_validator("vocab")
-    def validate_each_vocab_value(
-        cls,
-        value: Union[List[str], None],  # noqa: B902, N805
-    ) -> List[str]:
+    @classmethod
+    def validate_each_vocab_value(cls, value: list[str] | None) -> list[str]:
         """Validate the value of each vocab field."""
         if value == []:
             return None
         elif value is not None and not all(isinstance(v, str) for v in value):
-            raise ValueError("`vocab` must be a list of strings.")
+            raise ValueError("`vocab` must be a list of strings.")  # noqa: TRY003 EM101
 
         return value
 
     class Config:
         """Pydantic config class."""
 
-        json_schema_extra = {
+        json_schema_extra: ClassVar[dict] = {
             "example": {
                 "offset_start": None,
                 "offset_end": None,
@@ -210,7 +208,7 @@ class BaseRequest(BaseModel):
                 "log_prob_threshold": -1.0,
                 "no_speech_threshold": 0.6,
                 "condition_on_previous_text": True,
-            }
+            },
         }
 
 
@@ -222,7 +220,7 @@ class AudioRequest(BaseRequest):
     class Config:
         """Pydantic config class."""
 
-        json_schema_extra = {
+        json_schema_extra: ClassVar[dict] = {
             "example": {
                 "batch_size": 1,
                 "offset_start": None,
@@ -244,7 +242,7 @@ class AudioRequest(BaseRequest):
                 "no_speech_threshold": 0.6,
                 "condition_on_previous_text": True,
                 "multi_channel": False,
-            }
+            },
         }
 
 
@@ -256,7 +254,7 @@ class PongResponse(BaseModel):
     class Config:
         """Pydantic config class."""
 
-        json_schema_extra = {
+        json_schema_extra: ClassVar[dict] = {
             "example": {
                 "message": "pong",
             },
@@ -281,14 +279,14 @@ class DiarizationSegment(NamedTuple):
 class DiarizationOutput(BaseModel):
     """Diarization output model for the API."""
 
-    segments: List[DiarizationSegment]
+    segments: list[DiarizationSegment]
 
 
 class DiarizationRequest(BaseModel):
     """Request model for the diarize endpoint."""
 
-    audio: Union[TensorShare, str]
-    audio_type: Optional[str]
+    audio: np.ndarray | str
+    audio_type: str | None
     duration: float
     num_speakers: int
 
@@ -296,19 +294,19 @@ class DiarizationRequest(BaseModel):
 class MultiChannelTranscriptionOutput(BaseModel):
     """Multi-channel transcription output model for the API."""
 
-    segments: List[MultiChannelSegment]
+    segments: list[MultiChannelSegment]
 
 
 class TranscriptionOutput(BaseModel):
     """Transcription output model for the API."""
 
-    segments: List[Segment]
+    segments: list[Segment]
 
 
 class TranscribeRequest(BaseModel):
     """Request model for the transcribe endpoint."""
 
-    audio: Union[TensorShare, List[TensorShare]]
+    audio: np.ndarray | list[np.ndarray]
     compression_ratio_threshold: float
     condition_on_previous_text: bool
     internal_vad: bool
@@ -316,7 +314,7 @@ class TranscribeRequest(BaseModel):
     no_speech_threshold: float
     repetition_penalty: float
     source_lang: str
-    vocab: Union[List[str], None]
+    vocab: list[str] | None
 
 
 class Token(BaseModel):
@@ -329,4 +327,4 @@ class Token(BaseModel):
 class TokenData(BaseModel):
     """TokenData model for authentication."""
 
-    username: Optional[str] = None
+    username: str | None = None

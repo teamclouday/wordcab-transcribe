@@ -20,6 +20,8 @@
 """Dependencies for Wordcab Transcribe."""
 
 import asyncio
+import sys
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -77,40 +79,38 @@ elif settings.asr_type == "only_diarization":
         debug_mode=settings.debug,
     )
 else:
-    raise ValueError(f"Invalid ASR type: {settings.asr_type}")
+    raise ValueError(f"Invalid ASR type: {settings.asr_type}")  # noqa: TRY003 EM102
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI) -> None:
+async def lifespan(_: FastAPI) -> AsyncGenerator[None]:
     """Context manager to handle the startup and shutdown of the application."""
     if retrieve_user_platform() != "linux":
         logger.warning(
             "You are not running the application on Linux.\nThe application was tested"
             " on Ubuntu 22.04, so we cannot guarantee that it will work on other"
             " OS.\nReport any issues with your env specs to:"
-            " https://github.com/Wordcab/wordcab-transcribe/issues"
+            " https://github.com/Wordcab/wordcab-transcribe/issues",
         )
 
-    if settings.asr_type == "async" or settings.asr_type == "only_transcription":
+    if settings.asr_type in ["async", "only_transcription"]:
         if check_ffmpeg() is False:
             logger.warning(
                 "FFmpeg is not installed on the host machine.\n"
-                "Please install it and try again: `sudo apt-get install ffmpeg`"
+                "Please install it and try again: `sudo apt-get install ffmpeg`",
             )
-            exit(1)
+            sys.exit(1)
 
         if settings.extra_languages is not None:
             logger.info("Downloading models for extra languages...")
             for model in settings.extra_languages:
                 try:
-                    model_path = download_model(
-                        compute_type=settings.compute_type, language=model
-                    )
+                    model_path = download_model(compute_type=settings.compute_type, language=model)
 
                     if model_path is not None:
                         settings.extra_languages_model_paths[model] = model_path
                     else:
-                        raise Exception(f"Coudn't download model for {model}")
+                        raise Exception(f"Coudn't download model for {model}")  # noqa: TRY301 TRY003 TRY002 EM102
 
                 except Exception as e:
                     logger.error(f"Error downloading model for {model}: {e}")

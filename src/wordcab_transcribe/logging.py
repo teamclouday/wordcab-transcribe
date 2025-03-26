@@ -24,8 +24,9 @@ import asyncio
 import sys
 import time
 import uuid
+from collections.abc import Awaitable, Callable
 from functools import partial
-from typing import Any, Awaitable, Callable, Tuple
+from typing import Any
 
 from loguru import logger
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -43,14 +44,10 @@ class LoggingMiddleware(BaseHTTPMiddleware):
         logger.remove()
         logger.add(
             sys.stdout,
-            level=(
-                "DEBUG" if debug_mode else "INFO"
-            ),  # Avoid logging debug messages in prod
+            level=("DEBUG" if debug_mode else "INFO"),  # Avoid logging debug messages in prod
         )
 
-    async def dispatch(
-        self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
-    ) -> Response:
+    async def dispatch(self, request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
         """
         Dispatch a request and log it, along with the response and any errors.
 
@@ -72,17 +69,12 @@ class LoggingMiddleware(BaseHTTPMiddleware):
         response = await call_next(request)
 
         process_time = time.time() - start_time
-        logger.info(
-            f"Task [{tracing_id}] | Status: {response.status_code}, Time:"
-            f" {process_time:.4f} secs"
-        )
+        logger.info(f"Task [{tracing_id}] | Status: {response.status_code}, Time: {process_time:.4f} secs")
 
         return response
 
 
-def time_and_tell(
-    func: Callable, func_name: str, debug_mode: bool
-) -> Tuple[Any, float]:
+def time_and_tell(func: Callable, func_name: str, debug_mode: bool) -> tuple[Any, float]:
     """
     This decorator logs the execution time of a function only if the debug setting is True.
 
@@ -104,9 +96,7 @@ def time_and_tell(
     return result, process_time
 
 
-async def time_and_tell_async(
-    func: Callable, func_name: str, debug_mode: bool
-) -> Tuple[Any, float]:
+async def time_and_tell_async(func: Callable, func_name: str, debug_mode: bool) -> tuple[Any, float]:
     """
     This decorator logs the execution time of an async function only if the debug setting is True.
 
@@ -125,9 +115,7 @@ async def time_and_tell_async(
     else:
         loop = asyncio.get_event_loop()
         if isinstance(func, partial):
-            result = await loop.run_in_executor(
-                None, func.func, *func.args, **func.keywords
-            )
+            result = await loop.run_in_executor(None, func.func, *func.args, **func.keywords)
         else:
             result = await loop.run_in_executor(None, func)
 

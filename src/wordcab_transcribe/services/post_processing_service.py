@@ -19,8 +19,6 @@
 # and limitations under the License.
 """Post-Processing Service for audio files."""
 
-from typing import List, Tuple, Union
-
 from wordcab_transcribe.config import settings
 from wordcab_transcribe.models import (
     DiarizationOutput,
@@ -50,10 +48,10 @@ class PostProcessingService:
 
     def single_channel_speaker_mapping(
         self,
-        transcript_segments: List[Utterance],
+        transcript_segments: list[Utterance],
         speaker_timestamps: DiarizationOutput,
         word_timestamps: bool,
-    ) -> List[Utterance]:
+    ) -> list[Utterance]:
         """Run the post-processing functions on the inputs.
 
         The postprocessing pipeline is as follows:
@@ -77,14 +75,11 @@ class PostProcessingService:
             speaker_timestamps.segments,
         )
 
-        utterances = self.reconstruct_utterances(
-            segments_with_speaker_mapping, word_timestamps
-        )
-
-        return utterances
+        return self.reconstruct_utterances(segments_with_speaker_mapping, word_timestamps)
 
     def multi_channel_speaker_mapping(
-        self, multi_channel_segments: List[MultiChannelTranscriptionOutput]
+        self,
+        multi_channel_segments: list[MultiChannelTranscriptionOutput],
     ) -> TranscriptionOutput:
         """
         Run the multi-channel post-processing functions on the inputs by merging the segments based on the timestamps.
@@ -104,17 +99,13 @@ class PostProcessingService:
         ]
         words_with_speaker_mapping.sort(key=lambda x: x[1].start)
 
-        utterances: List[Utterance] = self.reconstruct_multi_channel_utterances(
-            words_with_speaker_mapping
-        )
-
-        return utterances
+        return self.reconstruct_multi_channel_utterances(words_with_speaker_mapping)
 
     def segments_speaker_mapping(
         self,
-        transcript_segments: List[Utterance],
-        speaker_timestamps: List[DiarizationSegment],
-    ) -> List[dict]:
+        transcript_segments: list[Utterance],
+        speaker_timestamps: list[DiarizationSegment],
+    ) -> list[dict]:
         """Function to map transcription and diarization results.
 
         Map each segment to its corresponding speaker based on the speaker timestamps and reconstruct the utterances
@@ -134,7 +125,7 @@ class PostProcessingService:
             split: bool,
             current_speaker: str,
             current_split_len: int,
-        ):
+        ) -> str:
             """Assign speaker to the segment."""
             if split and len(mapping) > 1:
                 last_split_len = len(mapping[seg_index - 1].text)
@@ -158,10 +149,7 @@ class PostProcessingService:
                 segment.end,
                 segment.text,
             )
-            while (
-                segment_start > float(end)
-                or abs(segment_start - float(end)) < threshold
-            ):
+            while segment_start > float(end) or abs(segment_start - float(end)) < threshold:
                 turn_idx += 1
                 turn_idx = min(turn_idx, len(speaker_timestamps) - 1)
                 _, end, speaker = speaker_timestamps[turn_idx]
@@ -175,8 +163,7 @@ class PostProcessingService:
                     (
                         i
                         for i, word in enumerate(words)
-                        if word.start > float(end)
-                        or abs(word.start - float(end)) < threshold
+                        if word.start > float(end) or abs(word.start - float(end)) < threshold
                     ),
                     None,
                 )
@@ -246,7 +233,7 @@ class PostProcessingService:
                             text=segment_text,
                             speaker=speaker,
                             words=words,
-                        )
+                        ),
                     )
             else:
                 speaker = _assign_speaker(
@@ -265,7 +252,7 @@ class PostProcessingService:
                         text=segment_text,
                         speaker=speaker,
                         words=segment.words,
-                    )
+                    ),
                 )
             segment_index += 1
 
@@ -273,9 +260,9 @@ class PostProcessingService:
 
     def reconstruct_utterances(
         self,
-        transcript_segments: List[Utterance],
+        transcript_segments: list[Utterance],
         word_timestamps: bool,
-    ) -> List[Utterance]:
+    ) -> list[Utterance]:
         """
         Reconstruct the utterances based on the speaker mapping.
 
@@ -335,8 +322,8 @@ class PostProcessingService:
 
     def reconstruct_multi_channel_utterances(
         self,
-        transcript_words: List[Tuple[int, Word]],
-    ) -> List[Utterance]:
+        transcript_words: list[tuple[int, Word]],
+    ) -> list[Utterance]:
         """
         Reconstruct multi-channel utterances based on the speaker mapping.
 
@@ -387,43 +374,13 @@ class PostProcessingService:
 
         return [Utterance(**sentence) for sentence in sentences]
 
-    def punctuation_based_alignment(
-        self,
-        utterances: List[Utterance],
-        speaker_timestamps: DiarizationOutput,
-    ):
-        pass
-        # word_list = []
-        # for utterance in utterances:
-        #     for word in utterance.words:
-        #         word_list.append(word.word)
-        #
-        # labled_words = self.punct_model.predict(word_list)
-        #
-        # ending_puncts = ".?!"
-        # model_puncts = ".,;:!?"
-        #
-        # def is_acronym(w):
-        #     return re.fullmatch(r"\b(?:[a-zA-Z]\.){2,}", w)
-        #
-        # for ix, (word, labeled_tuple) in enumerate(zip(word_list, labled_words)):
-        #     if (
-        #             word
-        #             and labeled_tuple[1] in ending_puncts
-        #             and (word[-1] not in model_puncts or is_acronym(word))
-        #     ):
-        #         word += labeled_tuple[1]
-        #         if word.endswith(".."):
-        #             word = word.rstrip(".")
-        #         word_dict["word"] = word
-
     def final_processing_before_returning(
         self,
-        utterances: List[Utterance],
-        offset_start: Union[float, None],
+        utterances: list[Utterance],
+        offset_start: float | None,
         timestamps_format: Timestamps,
         word_timestamps: bool,
-    ) -> List[Utterance]:
+    ) -> list[Utterance]:
         """
         Do final processing before returning the utterances to the API.
 
@@ -441,22 +398,15 @@ class PostProcessingService:
             List[Utterance]:
                 List of utterances after final processing.
         """
-        if offset_start is not None:
-            offset_start = float(offset_start)
-        else:
-            offset_start = 0.0
+        offset_start = float(offset_start) if offset_start is not None else 0.0
 
         final_utterances = []
         for utterance in utterances:
             # Check if the utterance is not empty
             if utterance.text.strip():
                 utterance.text = format_punct(utterance.text)
-                utterance.start = convert_timestamp(
-                    (utterance.start + offset_start), timestamps_format
-                )
-                utterance.end = convert_timestamp(
-                    (utterance.end + offset_start), timestamps_format
-                )
+                utterance.start = convert_timestamp((utterance.start + offset_start), timestamps_format)
+                utterance.end = convert_timestamp((utterance.end + offset_start), timestamps_format)
                 utterance.words = utterance.words if word_timestamps else None
 
                 final_utterances.append(utterance)

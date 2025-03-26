@@ -23,17 +23,17 @@ import asyncio
 import time
 import traceback
 from abc import ABC, abstractmethod
+from collections.abc import AsyncGenerator
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Iterable, List, Optional, Tuple, Union
+from typing import Any, Literal
 
 import aiohttp
+import numpy as np
 import torch
 from loguru import logger
 from pydantic import BaseModel, ConfigDict
-from tensorshare import Backend, TensorShare
-from typing_extensions import Literal
 
 from wordcab_transcribe.config import settings
 from wordcab_transcribe.logging import time_and_tell, time_and_tell_async
@@ -59,14 +59,21 @@ from wordcab_transcribe.utils import early_return, format_segments, read_audio
 
 
 class AsyncLocationTrustedRedirectSession(aiohttp.ClientSession):
-    async def _request(self, method, url, location_trusted, *args, **kwargs):
+    async def _request(
+        self,
+        method: str,
+        url: str,
+        location_trusted: bool,
+        *args: Any,
+        **kwargs: Any,
+    ) -> aiohttp.ClientResponse:
         if not location_trusted:
-            return await super(AsyncLocationTrustedRedirectSession, self)._request(method, url, *args, **kwargs)
+            return await super()._request(method, url, *args, **kwargs)
         kwargs["allow_redirects"] = False
-        response = await super(AsyncLocationTrustedRedirectSession, self)._request(method, url, *args, **kwargs)
+        response = await super()._request(method, url, *args, **kwargs)
         if response.status in (301, 302, 303, 307, 308) and "Location" in response.headers:
             new_url = response.headers["Location"]
-            return await super(AsyncLocationTrustedRedirectSession, self)._request(method, new_url, *args, **kwargs)
+            return await super()._request(method, new_url, *args, **kwargs)
         return response
 
 
@@ -91,7 +98,7 @@ class ProcessException(BaseModel):
 class LocalExecution(BaseModel):
     """Local execution model."""
 
-    index: Union[int, None]
+    index: int | None
 
 
 class RemoteExecution(BaseModel):
@@ -105,14 +112,14 @@ class ASRTask(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    audio: Union[torch.Tensor, List[torch.Tensor]]
-    url: Union[str, None]
-    url_type: Union[str, None]
+    audio: np.ndarray | list[np.ndarray]
+    url: str | None
+    url_type: str | None
     diarization: "DiarizationTask"
     duration: float
     batch_size: int
     multi_channel: bool
-    offset_start: Union[float, None]
+    offset_start: float | None
     post_processing: "PostProcessingTask"
     process_times: ProcessTimes
     timestamps_format: Timestamps
@@ -123,15 +130,15 @@ class ASRTask(BaseModel):
 class DiarizationTask(BaseModel):
     """Diarization Task model."""
 
-    execution: Union[LocalExecution, RemoteExecution, None]
+    execution: LocalExecution | RemoteExecution | None
     num_speakers: int
-    result: Union[ProcessException, DiarizationOutput, None] = None
+    result: ProcessException | DiarizationOutput | None = None
 
 
 class PostProcessingTask(BaseModel):
     """Post Processing Task model."""
 
-    result: Union[ProcessException, List[Utterance], None] = None
+    result: ProcessException | list[Utterance] | None = None
 
 
 class TranscriptionOptions(BaseModel):
@@ -145,35 +152,39 @@ class TranscriptionOptions(BaseModel):
     repetition_penalty: float
     source_lang: str
     num_beams: int
-    vocab: Union[List[str], None]
+    vocab: list[str] | None
 
 
 class TranscriptionTask(BaseModel):
     """Transcription Task model."""
 
-    execution: Union[LocalExecution, RemoteExecution]
+    execution: LocalExecution | RemoteExecution
     options: TranscriptionOptions
-    result: Union[ProcessException, TranscriptionOutput, List[TranscriptionOutput], None] = None
+    result: ProcessException | TranscriptionOutput | list[TranscriptionOutput] | None = None
 
 
 @dataclass
 class LocalServiceRegistry:
     """Registry for local services."""
 
-    diarization: Union[DiarizeService, LongFormDiarizeService, None] = None
-    post_processing: PostProcessingService = PostProcessingService()
-    transcription: Union[TranscribeService, None] = None
-    vad: VadService = VadService()
+    diarization: DiarizeService | LongFormDiarizeService | None = None
+    post_processing: PostProcessingService = None
+    transcription: TranscribeService | None = None
+    vad: VadService = None
+
+    def __post_init__(self) -> None:
+        self.post_processing = PostProcessingService()
+        self.vad = VadService()
 
 
 @dataclass
 class RemoteServiceConfig:
     """Remote service config."""
 
-    url_handler: Union[URLService, None] = None
+    url_handler: URLService | None = None
     use_remote: bool = False
 
-    def get_urls(self) -> List[str]:
+    def get_urls(self) -> list[str]:
         """Get the list of URLs."""
         return self.url_handler.get_urls()
 
@@ -198,8 +209,12 @@ class RemoteServiceConfig:
 class RemoteServiceRegistry:
     """Registry for remote services."""
 
-    diarization: RemoteServiceConfig = RemoteServiceConfig()
-    transcription: RemoteServiceConfig = RemoteServiceConfig()
+    diarization: RemoteServiceConfig = None
+    transcription: RemoteServiceConfig = None
+
+    def __post_init__(self) -> None:
+        self.diarization = RemoteServiceConfig()
+        self.transcription = RemoteServiceConfig()
 
 
 class ASRService(ABC):
@@ -224,23 +239,23 @@ class ASRService(ABC):
     @abstractmethod
     async def process_input(self) -> None:
         """Process the input request by creating a task and adding it to the appropriate queues."""
-        raise NotImplementedError("This method should be implemented in subclasses.")
+        raise NotImplementedError("This method should be implemented in subclasses.")  # noqa: EM101
 
 
 class ASRAsyncService(ASRService):
     """ASR Service module for async endpoints."""
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         whisper_model: str,
         compute_type: str,
-        window_lengths: List[float],
-        shift_lengths: List[float],
-        multiscale_weights: List[float],
-        extra_languages: Union[List[str], None],
-        extra_languages_model_paths: Union[List[str], None],
-        transcribe_server_urls: Union[List[str], None],
-        diarize_server_urls: Union[List[str], None],
+        window_lengths: list[float],
+        shift_lengths: list[float],
+        multiscale_weights: list[float],
+        extra_languages: list[str] | None,
+        extra_languages_model_paths: list[str] | None,
+        transcribe_server_urls: list[str] | None,
+        diarize_server_urls: list[str] | None,
         debug_mode: bool,
     ) -> None:
         """
@@ -274,11 +289,11 @@ class ASRAsyncService(ASRService):
 
         self.whisper_model: str = whisper_model
         self.compute_type: str = compute_type
-        self.window_lengths: List[float] = window_lengths
-        self.shift_lengths: List[float] = shift_lengths
-        self.multiscale_weights: List[float] = multiscale_weights
-        self.extra_languages: Union[List[str], None] = extra_languages
-        self.extra_languages_model_paths: Union[List[str], None] = extra_languages_model_paths
+        self.window_lengths: list[float] = window_lengths
+        self.shift_lengths: list[float] = shift_lengths
+        self.multiscale_weights: list[float] = multiscale_weights
+        self.extra_languages: list[str] | None = extra_languages
+        self.extra_languages_model_paths: list[str] | None = extra_languages_model_paths
 
         self.local_services: LocalServiceRegistry = LocalServiceRegistry()
         self.remote_services: RemoteServiceRegistry = RemoteServiceRegistry()
@@ -349,7 +364,7 @@ class ASRAsyncService(ASRService):
         elif task == "diarization":
             self.create_diarization_local_service()
         else:
-            raise NotImplementedError("No task specified.")
+            raise NotImplementedError("No task specified.")  # noqa: EM101
 
     async def inference_warmup(self) -> None:
         """Warmup the GPU by loading the models."""
@@ -378,19 +393,19 @@ class ASRAsyncService(ASRService):
                 condition_on_previous_text=True,
             )
 
-    async def process_input(  # noqa: C901
+    async def process_input(  # noqa: PLR0913 PLR0912
         self,
-        filepath: Union[str, List[str]],
-        batch_size: Union[int, None],
-        offset_start: Union[float, None],
-        offset_end: Union[float, None],
+        filepath: str | list[str],
+        batch_size: int | None,
+        offset_start: float | None,
+        offset_end: float | None,
         num_speakers: int,
         diarization: bool,
         multi_channel: bool,
         source_lang: str,
         num_beams: int,
         timestamps_format: str,
-        vocab: Union[List[str], None],
+        vocab: list[str] | None,
         word_timestamps: bool,
         internal_vad: bool,
         repetition_penalty: float,
@@ -398,9 +413,9 @@ class ASRAsyncService(ASRService):
         log_prob_threshold: float,
         no_speech_threshold: float,
         condition_on_previous_text: bool,
-        url: Optional[str] = None,
-        url_type: Optional[str] = None,
-    ) -> Union[Tuple[List[dict], ProcessTimes, float], Exception]:
+        url: str | None = None,
+        url_type: str | None = None,
+    ) -> tuple[list[dict], ProcessTimes, float] | Exception:
         """Process the input request and return the results.
 
         This method will create a task and add it to the appropriate queues.
@@ -413,7 +428,7 @@ class ASRAsyncService(ASRService):
             filepath (Union[str, List[str]]):
                 Path to the audio file or list of paths to the audio files to process.
             batch_size (Union[int, None]):
-                The batch size to use for the transcription. For tensorrt-llm and faster-whisper-batch engines only.
+                The batch size to use for the transcription. For faster-whisper-batch engines only.
             offset_start (Union[float, None]):
                 The start time of the audio file to process.
             offset_end (Union[float, None]):
@@ -549,10 +564,11 @@ class ASRAsyncService(ASRService):
 
             task.process_times.total = time.time() - start_process_time
 
-            return task.post_processing.result, task.process_times, duration
-
         except Exception as e:
             return e
+
+        else:
+            return task.post_processing.result, task.process_times, duration
 
         finally:
             del task
@@ -596,13 +612,8 @@ class ASRAsyncService(ASRService):
                 result, process_time = out
 
             elif isinstance(task.transcription.execution, RemoteExecution):
-                if isinstance(task.audio, list):
-                    ts = [TensorShare.from_dict({"audio": a}, backend=Backend.TORCH) for a in task.audio]
-                else:
-                    ts = TensorShare.from_dict({"audio": task.audio}, backend=Backend.TORCH)
-
                 data = TranscribeRequest(
-                    audio=ts,
+                    audio=task.audio,
                     **task.transcription.options.model_dump(),
                 )
                 out = await time_and_tell_async(
@@ -616,7 +627,7 @@ class ASRAsyncService(ASRService):
                 result, process_time = out
 
             else:
-                raise NotImplementedError("No execution method specified.")
+                raise NotImplementedError("No execution method specified.")  # noqa: TRY301 EM101
 
         except Exception as e:
             result = ProcessException(
@@ -628,8 +639,6 @@ class ASRAsyncService(ASRService):
         finally:
             task.process_times.transcription = process_time
             task.transcription.result = result
-
-        return None
 
     async def process_diarization(self, task: ASRTask, debug_mode: bool) -> None:
         """
@@ -673,7 +682,7 @@ class ASRAsyncService(ASRService):
                     audio = task.url
                     audio_type = task.url_type
                 else:
-                    audio = TensorShare.from_dict({"audio": task.audio}, backend=Backend.TORCH)
+                    audio = task.audio
                     audio_type = "tensor"
 
                 data = DiarizationRequest(
@@ -697,7 +706,7 @@ class ASRAsyncService(ASRService):
                 process_time = None
 
             else:
-                raise NotImplementedError("No execution method specified.")
+                raise NotImplementedError("No execution method specified.")  # noqa: TRY301 EM101
 
         except Exception as e:
             result = ProcessException(
@@ -709,8 +718,6 @@ class ASRAsyncService(ASRService):
         finally:
             task.process_times.diarization = process_time
             task.diarization.result = result
-
-        return None
 
     def process_post_processing(self, task: ASRTask) -> None:
         """
@@ -791,8 +798,6 @@ class ASRAsyncService(ASRService):
             task.process_times.post_processing = total_post_process_time
             task.post_processing.result = final_utterances
 
-        return None
-
     async def remote_transcription(
         self,
         url: str,
@@ -804,34 +809,38 @@ class ASRAsyncService(ASRService):
         if not settings.debug:
             headers = {"Content-Type": "application/x-www-form-urlencoded"}
             auth_url = f"{url}/api/v1/auth"
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
+            async with (
+                aiohttp.ClientSession() as session,
+                session.post(
                     url=auth_url,
                     data={"username": settings.username, "password": settings.password},
                     headers=headers,
-                ) as response:
-                    if response.status != 200:
-                        raise Exception(response.status)
-                    else:
-                        token = await response.json()
-                        headers = {
-                            "Content-Type": "application/json",
-                            "Authorization": f"Bearer {token['access_token']}",
-                        }
+                ) as response,
+            ):
+                if not response.ok:
+                    raise Exception(response.status)  # noqa: TRY002
+
+                token = await response.json()
+                headers = {
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {token['access_token']}",
+                }
 
         transcription_timeout = aiohttp.ClientTimeout(total=1200)
-        async with AsyncLocationTrustedRedirectSession(timeout=transcription_timeout) as session:
-            async with session.post(
+        async with (
+            AsyncLocationTrustedRedirectSession(timeout=transcription_timeout) as session,
+            session.post(
                 url=f"{url}/api/v1/transcribe",
                 data=data.model_dump_json(),
                 headers=headers,
                 location_trusted=True,
-            ) as response:
-                if response.status != 200:
-                    r = await response.json()
-                    raise Exception(r["detail"])
-                else:
-                    return TranscriptionOutput(**await response.json())
+            ) as response,
+        ):
+            if not response.ok:
+                r = await response.json()
+                raise Exception(r["detail"])  # noqa: TRY002
+
+            return TranscriptionOutput(**await response.json())
 
     async def remote_diarization(
         self,
@@ -845,36 +854,40 @@ class ASRAsyncService(ASRService):
             headers = {"Content-Type": "application/x-www-form-urlencoded"}
             auth_url = f"{url}/api/v1/auth"
             diarization_timeout = aiohttp.ClientTimeout(total=10)
-            async with AsyncLocationTrustedRedirectSession(timeout=diarization_timeout) as session:
-                async with session.post(
+            async with (
+                AsyncLocationTrustedRedirectSession(timeout=diarization_timeout) as session,
+                session.post(
                     url=auth_url,
                     data={"username": settings.username, "password": settings.password},
                     headers=headers,
                     location_trusted=True,
-                ) as response:
-                    if response.status != 200:
-                        raise Exception(response.status)
-                    else:
-                        token = await response.json()
-                        headers = {
-                            "Content-Type": "application/json",
-                            "Authorization": f"Bearer {token['access_token']}",
-                        }
+                ) as response,
+            ):
+                if not response.ok:
+                    raise Exception(response.status)  # noqa: TRY002
+
+                token = await response.json()
+                headers = {
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {token['access_token']}",
+                }
         diarization_timeout = aiohttp.ClientTimeout(total=1200)
-        async with AsyncLocationTrustedRedirectSession(timeout=diarization_timeout) as session:
-            async with session.post(
+        async with (
+            AsyncLocationTrustedRedirectSession(timeout=diarization_timeout) as session,
+            session.post(
                 url=f"{url}/api/v1/diarize",
                 data=data.model_dump_json(),
                 headers=headers,
                 location_trusted=True,
-            ) as response:
-                if response.status != 200:
-                    r = await response.json()
-                    raise Exception(r["detail"])
-                else:
-                    return DiarizationOutput(**await response.json())
+            ) as response,
+        ):
+            if not response.ok:
+                r = await response.json()
+                raise Exception(r["detail"])  # noqa: TRY002
 
-    async def get_url(self, task: Literal["transcription", "diarization"]) -> Union[List[str], ProcessException]:
+            return DiarizationOutput(**await response.json())
+
+    async def get_url(self, task: Literal["transcription", "diarization"]) -> list[str] | ProcessException:
         """Get the list of remote URLs."""
         logger.info(self.remote_services.transcription)
         logger.info(self.remote_services.diarization)
@@ -897,7 +910,7 @@ class ASRAsyncService(ASRService):
                 message=f"Error in getting URL: {e}\n{traceback.format_exc()}",
             )
 
-    async def add_url(self, data: UrlSchema) -> Union[UrlSchema, ProcessException]:
+    async def add_url(self, data: UrlSchema) -> UrlSchema | ProcessException:
         """Add a remote URL to the list of URLs."""
         try:
             selected_task = getattr(self.remote_services, data.task)
@@ -924,28 +937,28 @@ class ASRAsyncService(ASRService):
 
         return data
 
-    async def remove_url(self, data: UrlSchema) -> Union[UrlSchema, ProcessException]:
+    async def remove_url(self, data: UrlSchema) -> UrlSchema | ProcessException:
         """Remove a remote URL from the list of URLs."""
         try:
             selected_task = getattr(self.remote_services, data.task)
             # Case 1: We are not using remote task
             if selected_task.use_remote is False:
-                raise ValueError(f"You are not using remote {data.task}.")
+                raise ValueError(f"You are not using remote {data.task}.")  # noqa: TRY003 TRY301 EM102
             # Case 2: We are using remote task
-            else:
-                await selected_task.remove_url(str(data.url))
-                if selected_task.get_queue_size() == 0:
-                    # No more remote URLs, switch to local service
-                    self.create_local_service(task=data.task)
-                    setattr(self.remote_services, data.task, RemoteServiceConfig())
-
-            return data
+            await selected_task.remove_url(str(data.url))
+            if selected_task.get_queue_size() == 0:
+                # No more remote URLs, switch to local service
+                self.create_local_service(task=data.task)
+                setattr(self.remote_services, data.task, RemoteServiceConfig())
 
         except Exception as e:
             return ProcessException(
                 source=ExceptionSource.remove_url,
                 message=f"Error in removing URL: {e}\n{traceback.format_exc()}",
             )
+
+        else:
+            return data
 
 
 class ASRLiveService(ASRService):
@@ -967,14 +980,14 @@ class ASRLiveService(ASRService):
     async def inference_warmup(self) -> None:
         """Warmup the GPU by loading the models."""
         sample_audio = Path(__file__).parent.parent / "assets/warmup_sample.wav"
-        with open(sample_audio, "rb") as audio_file:
+        with Path.open(sample_audio, "rb") as audio_file:
             async for _ in self.process_input(
                 data=audio_file.read(),
                 source_lang="en",
             ):
                 pass
 
-    async def process_input(self, data: bytes, source_lang: str) -> Iterable[dict]:
+    async def process_input(self, data: bytes, source_lang: str) -> AsyncGenerator[dict]:
         """
         Process the input data and return the results as a tuple of text and duration.
 
@@ -993,7 +1006,9 @@ class ASRLiveService(ASRService):
             waveform, _ = read_audio(data)
 
             async for result in self.transcription_service.async_live_transcribe(
-                audio=waveform, source_lang=source_lang, model_index=gpu_index
+                audio=waveform,
+                source_lang=source_lang,
+                model_index=gpu_index,
             ):
                 yield result
 
@@ -1011,8 +1026,8 @@ class ASRTranscriptionOnly(ASRService):
         self,
         whisper_model: str,
         compute_type: str,
-        extra_languages: Union[List[str], None],
-        extra_languages_model_paths: Union[List[str], None],
+        extra_languages: list[str] | None,
+        extra_languages_model_paths: list[str] | None,
         debug_mode: bool,
     ) -> None:
         """Initialize the ASRTranscriptionOnly class."""
@@ -1034,7 +1049,7 @@ class ASRTranscriptionOnly(ASRService):
         sample_audio = Path(__file__).parent.parent / "assets/warmup_sample.wav"
 
         audio, _ = read_audio(str(sample_audio))
-        ts = TensorShare.from_dict({"audio": audio}, backend=Backend.TORCH)
+        ts = audio.numpy()
 
         data = TranscribeRequest(
             audio=ts,
@@ -1052,7 +1067,7 @@ class ASRTranscriptionOnly(ASRService):
             logger.info(f"Warmup GPU {gpu_index}.")
             await self.process_input(data=data)
 
-    async def process_input(self, data: TranscribeRequest) -> Union[TranscriptionOutput, List[TranscriptionOutput]]:
+    async def process_input(self, data: TranscribeRequest) -> TranscriptionOutput | list[TranscriptionOutput]:
         """
         Process the input data and return the results as a list of segments.
 
@@ -1101,9 +1116,9 @@ class ASRDiarizationOnly(ASRService):
 
     def __init__(
         self,
-        window_lengths: List[int],
-        shift_lengths: List[int],
-        multiscale_weights: List[float],
+        window_lengths: list[int],
+        shift_lengths: list[int],
+        multiscale_weights: list[float],
         debug_mode: bool,
     ) -> None:
         """Initialize the ASRDiarizationOnly class."""
@@ -1129,7 +1144,7 @@ class ASRDiarizationOnly(ASRService):
         sample_audio = Path(__file__).parent.parent / "assets/warmup_sample.wav"
 
         audio, duration = read_audio(str(sample_audio))
-        ts = TensorShare.from_dict({"audio": audio}, backend=Backend.TORCH)
+        ts = audio.numpy()
 
         data = DiarizationRequest(
             audio=ts,
@@ -1175,7 +1190,7 @@ class ASRDiarizationOnly(ASRService):
                     vad_service=self.vad_service,
                 )
             else:
-                raise ValueError(f"Invalid audio type: {data.audio_type}. Must be one of ['tensor', 'url'].")
+                raise ValueError(f"Invalid audio type: {data.audio_type}. Must be one of ['tensor', 'url'].")  # noqa: TRY003 TRY301 EM102
 
         except Exception as e:
             result = ProcessException(

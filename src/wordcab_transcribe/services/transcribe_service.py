@@ -18,19 +18,18 @@
 # See the License for the specific language governing permissions
 # and limitations under the License.
 """Transcribe Service for audio files."""
-from typing import Iterable, List, NamedTuple, Optional, Union
 
+from collections.abc import AsyncGenerator, Iterable
+from typing import NamedTuple
+
+import numpy as np
 import torch
+from faster_whisper import BatchedInferencePipeline, WhisperModel
 from loguru import logger
-from tensorshare import Backend, TensorShare
-from faster_whisper import WhisperModel, BatchedInferencePipeline
 
-from wordcab_transcribe.config import settings
-from wordcab_transcribe.engines.tensorrt_llm.model import WhisperModelTRT
 from wordcab_transcribe.models import (
     MultiChannelSegment,
     MultiChannelTranscriptionOutput,
-    Segment,
     TranscriptionOutput,
     Word,
 )
@@ -46,15 +45,15 @@ class FasterWhisperModel(NamedTuple):
 class TranscribeService:
     """Transcribe Service for audio files."""
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         model_path: str,
         model_engine: str,
         compute_type: str,
         device: str,
-        device_index: Union[int, List[int]],
-        extra_languages: Union[List[str], None] = None,
-        extra_languages_model_paths: Union[List[str], None] = None,
+        device_index: int | list[int],
+        extra_languages: list[str] | None = None,
+        extra_languages_model_paths: list[str] | None = None,
     ) -> None:
         """Initialize the Transcribe Service.
 
@@ -95,23 +94,7 @@ class TranscribeService:
                     device=self.device,
                     device_index=device_index,
                     compute_type=self.compute_type,
-                )
-            )
-        elif self.model_engine == "tensorrt-llm":
-            logger.info("Using tensorrt-llm model engine.")
-            if "v3" in self.model_path:
-                n_mels = 128
-            else:
-                n_mels = 80
-            self.model = WhisperModelTRT(
-                self.model_path,
-                device=self.device,
-                device_index=device_index,
-                compute_type=self.compute_type,
-                asr_options={
-                    "word_align_model": settings.align_model,
-                },
-                n_mels=n_mels,
+                ),
             )
         else:
             self.model = WhisperModel(
@@ -124,22 +107,15 @@ class TranscribeService:
         self.extra_lang = extra_languages
         self.extra_lang_models = extra_languages_model_paths
 
-    def __call__(
+    def __call__(  # noqa: PLR0913
         self,
-        audio: Union[
-            str,
-            torch.Tensor,
-            TensorShare,
-            List[str],
-            List[torch.Tensor],
-            List[TensorShare],
-        ],
+        audio: str | torch.Tensor | np.ndarray | list[str] | list[torch.Tensor] | list[np.ndarray],
         source_lang: str,
-        model_index: int,
+        _model_index: int,
         batch_size: int,
         num_beams: int = 1,
         suppress_blank: bool = False,
-        vocab: Union[List[str], None] = None,
+        vocab: list[str] | None = None,
         word_timestamps: bool = True,
         internal_vad: bool = False,
         repetition_penalty: float = 1.0,
@@ -147,7 +123,7 @@ class TranscribeService:
         log_prob_threshold: float = -1.0,
         no_speech_threshold: float = 0.6,
         condition_on_previous_text: bool = True,
-    ) -> Union[TranscriptionOutput, List[TranscriptionOutput]]:
+    ) -> TranscriptionOutput | list[TranscriptionOutput]:
         """
         Run inference with the transcribe model.
 
@@ -190,12 +166,7 @@ class TranscribeService:
                 Transcription output. If the task is a multi_channel task, a list of TranscriptionOutput is returned.
         """
 
-        if (
-            vocab is not None
-            and isinstance(vocab, list)
-            and len(vocab) > 0
-            and vocab[0].strip()
-        ):
+        if vocab is not None and isinstance(vocab, list) and len(vocab) > 0 and vocab[0].strip():
             words = ", ".join(vocab)
             prompt = f"Vocab: {words.strip()}."
         else:
@@ -204,9 +175,6 @@ class TranscribeService:
         if not isinstance(audio, list):
             if isinstance(audio, torch.Tensor):
                 audio = audio.numpy()
-            elif isinstance(audio, TensorShare):
-                ts = audio.to_tensors(backend=Backend.NUMPY)
-                audio = ts["audio"]
 
             if self.model_engine == "faster-whisper":
                 segments, _ = self.model.transcribe(
@@ -231,7 +199,7 @@ class TranscribeService:
                     },
                 )
             elif self.model_engine == "faster-whisper-batched":
-                print("Batch size: ", batch_size)
+                logger.debug("Batch size: ", batch_size)
                 segments, _ = self.model.transcribe(
                     audio,
                     language=source_lang,
@@ -245,44 +213,6 @@ class TranscribeService:
                     word_timestamps=word_timestamps,
                     batch_size=batch_size,
                 )
-            elif self.model_engine == "tensorrt-llm":
-                segments = self.model.transcribe(
-                    audio_data=[audio],
-                    lang_codes=[source_lang],
-                    tasks=["transcribe"],
-                    initial_prompts=[prompt],
-                    batch_size=batch_size,
-                    use_vad=internal_vad,
-                    generate_kwargs={
-                        "num_beams": num_beams,
-                        "length_penalty": 1,
-                        "repetition_penalty": repetition_penalty,
-                        "stop_words_list": suppress_blank,
-                        "bad_words_list": [-1],
-                        "temperature": 1.0,
-                    },
-                )[0]
-                #  TODO: make batch compatible
-
-                for ix, segment in enumerate(segments):
-                    segment["words"] = segment.pop("word_timestamps")
-                    for word in segment["words"]:
-                        word["word"] = f" {word['word']}"
-                        word["start"] = round(word["start"], 2)
-                        word["end"] = round(word["end"], 2)
-                    segment["start"] = round(segment.pop("start_time"), 2)
-                    segment["end"] = round(segment.pop("end_time"), 2)
-                    extra = {
-                        "seek": 1,
-                        "id": 1,
-                        "tokens": [1],
-                        "temperature": 0.0,
-                        "avg_logprob": 0.0,
-                        "compression_ratio": 0.0,
-                        "no_speech_prob": 0.0,
-                    }
-                    segments[ix] = Segment(**{**segment, **extra})
-
             _outputs = [segment._asdict() for segment in segments]
             outputs = TranscriptionOutput(segments=_outputs)
         else:
@@ -306,7 +236,7 @@ class TranscribeService:
         audio: torch.Tensor,
         source_lang: str,
         model_index: int,
-    ) -> Iterable[dict]:
+    ) -> AsyncGenerator[dict]:
         """Async generator for live transcriptions.
 
         This method wraps the live_transcribe method to make it async.
@@ -326,7 +256,7 @@ class TranscribeService:
         self,
         audio: torch.Tensor,
         source_lang: str,
-        model_index: int,
+        _model_index: int,
     ) -> Iterable[dict]:
         """
         Transcribe audio from a WebSocket connection.
@@ -349,9 +279,9 @@ class TranscribeService:
         for segment in segments:
             yield segment._asdict()
 
-    def multi_channel(
+    def multi_channel(  # noqa: PLR0913
         self,
-        audio_list: List[Union[str, torch.Tensor, TensorShare]],
+        audio_list: list[str | torch.Tensor | np.ndarray],
         source_lang: str,
         num_beams: int = 1,
         suppress_blank: bool = False,
@@ -362,7 +292,7 @@ class TranscribeService:
         log_prob_threshold: float = -1.0,
         no_speech_threshold: float = 0.6,
         condition_on_previous_text: bool = False,
-        prompt: Optional[str] = None,
+        prompt: str | None = None,
     ) -> MultiChannelTranscriptionOutput:
         """
         Transcribe an audio file using the faster-whisper original pipeline.
@@ -403,9 +333,8 @@ class TranscribeService:
                 final_segments = []
                 if isinstance(audio, torch.Tensor):
                     _audio = audio.numpy()
-                elif isinstance(audio, TensorShare):
-                    ts = audio.to_tensors(backend=Backend.NUMPY)
-                    _audio = ts["audio"]
+                elif isinstance(audio, np.ndarray):
+                    _audio = audio
 
                 segments, _ = self.model.transcribe(
                     _audio,
@@ -435,70 +364,6 @@ class TranscribeService:
                         end=segment.end,
                         text=segment.text,
                         words=[Word(**word._asdict()) for word in segment.words],
-                        speaker=speaker_id,
-                    )
-                    final_segments.append(_segment)
-
-                outputs.append(MultiChannelTranscriptionOutput(segments=final_segments))
-        elif self.model_engine == "tensorrt-llm":
-            audio_channels = []
-            speaker_ids = []
-
-            for speaker_id, audio in enumerate(audio_list):
-                if isinstance(audio, torch.Tensor):
-                    audio = audio.numpy()
-                elif isinstance(audio, TensorShare):
-                    ts = audio.to_tensors(backend=Backend.NUMPY)
-                    audio = ts["audio"]
-                audio_channels.append(audio)
-                speaker_ids.append(speaker_id)
-
-            channels_len = len(audio_channels)
-            segments_list = self.model.transcribe(
-                audio_data=audio_channels,
-                lang_codes=[source_lang] * channels_len,
-                tasks=["transcribe"] * channels_len,
-                initial_prompts=[prompt] * channels_len,
-                batch_size=1,
-                use_vad=internal_vad,
-                generate_kwargs={
-                    "num_beams": num_beams,
-                    "length_penalty": 1,
-                    "repetition_penalty": repetition_penalty,
-                    "stop_words_list": suppress_blank,
-                    "bad_words_list": [-1],
-                    "temperature": 1.0,
-                },
-            )
-
-            for speaker_id, segments in enumerate(segments_list):
-                final_segments = []
-
-                for segment in segments:
-                    segment["words"] = segment.pop("word_timestamps")
-                    for word in segment["words"]:
-                        word["word"] = f" {word['word']}"
-                        word["start"] = round(word["start"], 2)
-                        word["end"] = round(word["end"], 2)
-                    segment["text"] = segment["text"].strip()
-
-                    segment["start"] = round(segment.pop("start_time"), 2)
-                    segment["end"] = round(segment.pop("end_time"), 2)
-                    extra = {
-                        "seek": 1,
-                        "id": 1,
-                        "tokens": [1],
-                        "temperature": 0.0,
-                        "avg_logprob": 0.0,
-                        "compression_ratio": 0.0,
-                        "no_speech_prob": 0.0,
-                    }
-                    _segment = Segment(**{**segment, **extra})
-                    _segment = MultiChannelSegment(
-                        start=_segment.start,
-                        end=_segment.end,
-                        text=_segment.text,
-                        words=[Word(**word) for word in _segment.words],
                         speaker=speaker_id,
                     )
                     final_segments.append(_segment)

@@ -20,7 +20,7 @@
 """Audio file endpoint for the Wordcab Transcribe API."""
 
 import asyncio
-from typing import List, Union
+from typing import Annotated
 
 import shortuuid
 from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, UploadFile
@@ -40,36 +40,30 @@ from wordcab_transcribe.utils import (
 router = APIRouter()
 
 
-@router.post(
-    "", response_model=Union[AudioResponse, str], status_code=http_status.HTTP_200_OK
-)
-async def inference_with_audio(  # noqa: C901
+@router.post("", response_model=AudioResponse | str, status_code=http_status.HTTP_200_OK)
+async def inference_with_audio(  # noqa: PLR0913
     background_tasks: BackgroundTasks,
-    batch_size: Union[int, None] = Form(None),  # noqa: B008
-    offset_start: Union[float, None] = Form(None),  # noqa: B008
-    offset_end: Union[float, None] = Form(None),  # noqa: B008
-    num_speakers: int = Form(-1),  # noqa: B008
-    diarization: bool = Form(False),  # noqa: B008
-    multi_channel: bool = Form(False),  # noqa: B008
-    source_lang: str = Form("en"),  # noqa: B008
-    num_beams: int = Form(1),  # noqa: B008
-    timestamps: str = Form("s"),  # noqa: B008
-    vocab: Union[List[str], None] = Form(None),  # noqa: B008
-    word_timestamps: bool = Form(False),  # noqa: B008
-    internal_vad: bool = Form(False),  # noqa: B008
-    repetition_penalty: float = Form(1.2),  # noqa: B008
-    compression_ratio_threshold: float = Form(2.4),  # noqa: B008
-    log_prob_threshold: float = Form(-1.0),  # noqa: B008
-    no_speech_threshold: float = Form(0.6),  # noqa: B008
-    condition_on_previous_text: bool = Form(True),  # noqa: B008
-    file: UploadFile = File(...),  # noqa: B008
+    batch_size: Annotated[int | None, Form(None)],
+    offset_start: Annotated[float | None, Form(None)],
+    offset_end: Annotated[float | None, Form(None)],
+    num_speakers: Annotated[int, Form(-1)],
+    diarization: Annotated[bool, Form(False)],  # noqa: FBT003
+    multi_channel: Annotated[bool, Form(False)],  # noqa: FBT003
+    source_lang: Annotated[str, Form("en")],
+    num_beams: Annotated[int, Form(1)],
+    timestamps: Annotated[str, Form("s")],
+    vocab: Annotated[list[str] | None, Form(None)],
+    word_timestamps: Annotated[bool, Form(False)],  # noqa: FBT003
+    internal_vad: Annotated[bool, Form(False)],  # noqa: FBT003
+    repetition_penalty: Annotated[float, Form(1.2)],
+    compression_ratio_threshold: Annotated[float, Form(2.4)],
+    log_prob_threshold: Annotated[float, Form(-1.0)],
+    no_speech_threshold: Annotated[float, Form(0.6)],
+    condition_on_previous_text: Annotated[bool, Form(True)],  # noqa: FBT003
+    file: Annotated[UploadFile, File(...)],
 ) -> AudioResponse:
     """Inference endpoint with audio file."""
-    if file.filename is not None:
-        extension = file.filename.split(".")[-1]
-    else:
-        extension = "wav"
-
+    extension = file.filename.split(".")[-1] if file.filename is not None else "wav"
     filename = f"audio_{shortuuid.ShortUUID().random(length=32)}.{extension}"
 
     await save_file_locally(filename=filename, file=file)
@@ -82,15 +76,13 @@ async def inference_with_audio(  # noqa: C901
         multi_channel = False
 
     try:
-        filepath: Union[str, List[str]] = await process_audio_file(
-            filename, num_channels=num_channels
-        )
+        filepath: str | list[str] = await process_audio_file(filename, num_channels=num_channels)
     except Exception as e:
         try:
             background_tasks.add_task(delete_file, filepath=filename)
             background_tasks.add_task(delete_file, filepath=filepath)
-        except:
-            pass
+        except Exception:
+            logger.debug("Failed to delete file")
         raise HTTPException(  # noqa: B904
             status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Process failed: {e}",
@@ -137,7 +129,7 @@ async def inference_with_audio(  # noqa: C901
             log_prob_threshold=data.log_prob_threshold,
             no_speech_threshold=data.no_speech_threshold,
             condition_on_previous_text=data.condition_on_previous_text,
-        )
+        ),
     )
     result = await task
 
@@ -149,26 +141,26 @@ async def inference_with_audio(  # noqa: C901
             status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(result.message),
         )
-    else:
-        utterances, process_times, audio_duration = result
-        return AudioResponse(
-            utterances=utterances,
-            audio_duration=audio_duration,
-            offset_start=data.offset_start,
-            offset_end=data.offset_end,
-            num_speakers=data.num_speakers,
-            diarization=data.diarization,
-            batch_size=batch_size,
-            multi_channel=data.multi_channel,
-            source_lang=data.source_lang,
-            timestamps=data.timestamps,
-            vocab=data.vocab,
-            word_timestamps=data.word_timestamps,
-            internal_vad=data.internal_vad,
-            repetition_penalty=data.repetition_penalty,
-            compression_ratio_threshold=data.compression_ratio_threshold,
-            log_prob_threshold=data.log_prob_threshold,
-            no_speech_threshold=data.no_speech_threshold,
-            condition_on_previous_text=data.condition_on_previous_text,
-            process_times=process_times,
-        )
+
+    utterances, process_times, audio_duration = result
+    return AudioResponse(
+        utterances=utterances,
+        audio_duration=audio_duration,
+        offset_start=data.offset_start,
+        offset_end=data.offset_end,
+        num_speakers=data.num_speakers,
+        diarization=data.diarization,
+        batch_size=batch_size,
+        multi_channel=data.multi_channel,
+        source_lang=data.source_lang,
+        timestamps=data.timestamps,
+        vocab=data.vocab,
+        word_timestamps=data.word_timestamps,
+        internal_vad=data.internal_vad,
+        repetition_penalty=data.repetition_penalty,
+        compression_ratio_threshold=data.compression_ratio_threshold,
+        log_prob_threshold=data.log_prob_threshold,
+        no_speech_threshold=data.no_speech_threshold,
+        condition_on_previous_text=data.condition_on_previous_text,
+        process_times=process_times,
+    )

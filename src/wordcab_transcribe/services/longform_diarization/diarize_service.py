@@ -22,14 +22,14 @@
 import json
 import tempfile
 from pathlib import Path
-from typing import List, Optional, Tuple, Union
 
+import numpy as np
 import shortuuid
 import torch
 import torchaudio
 from nemo.collections.asr.models import NeuralDiarizer
 from omegaconf import OmegaConf
-from tensorshare import Backend, TensorShare
+from pyannote.core import Annotation
 
 from wordcab_transcribe.models import DiarizationOutput
 from wordcab_transcribe.utils import (
@@ -57,22 +57,20 @@ class LongFormDiarizeService:
             None
         """
         config_path = Path(__file__).parent / "configs" / f"{domain}.json"
-        with open(config_path, "r") as f:
+        with Path.open(config_path, "r") as f:
             general_conf = json.load(f)
 
         config = OmegaConf.create(general_conf)
-        self.diarization_model = NeuralDiarizer.from_pretrained(
-            model_name="diar_msdd_telephonic"
-        ).to(device)
-        self.diarization_model._cfg = config
-        # TODO: Ability to modify config
+        self.diarization_model = NeuralDiarizer.from_pretrained(model_name="diar_msdd_telephonic").to(device)
+        self.diarization_model._cfg = config  # noqa: SLF001
+        # NOTE: Ability to modify config
 
     def __call__(
         self,
         oracle_num_speakers: int,
-        waveform: Optional[Union[torch.Tensor, TensorShare]] = None,
-        url: Optional[str] = None,
-        url_type: Optional[str] = None,
+        waveform: torch.Tensor | np.ndarray | None = None,
+        url: str | None = None,
+        url_type: str | None = None,
     ) -> DiarizationOutput:
         """
         Run inference with the diarization model.
@@ -92,14 +90,11 @@ class LongFormDiarizeService:
             audio_filename = f"audio_{shortuuid.ShortUUID().random(length=32)}"
             audio_filepath = download_audio_file_sync(url_type, url, audio_filename)
             processed_audio_filepath = process_audio_file_sync(audio_filepath)
-            processed_audio_filepath = (
-                Path(__file__).parent / "temp_files" / processed_audio_filepath
-            )
+            processed_audio_filepath = Path(__file__).parent / "temp_files" / processed_audio_filepath
             delete_file(audio_filepath)
         else:
-            if isinstance(waveform, TensorShare):
-                ts = waveform.to_tensors(backend=Backend.TORCH)
-                waveform = ts["audio"]
+            if isinstance(waveform, np.ndarray):
+                waveform = torch.from_numpy(waveform)
             elif isinstance(waveform, torch.Tensor):
                 pass
             else:
@@ -109,16 +104,10 @@ class LongFormDiarizeService:
             if waveform.dim() == 1:
                 waveform = waveform.unsqueeze(0)
             with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_file:
-                torchaudio.save(
-                    temp_file.name, waveform, sample_rate=16000, channels_first=True
-                )
-                processed_audio_filepath = (
-                    Path(__file__).parent / "temp_files" / temp_file.name
-                )
+                torchaudio.save(temp_file.name, waveform, sample_rate=16000, channels_first=True)
+                processed_audio_filepath = Path(__file__).parent / "temp_files" / temp_file.name
 
-        temp_dir = (
-            Path(processed_audio_filepath).parent / Path(processed_audio_filepath).stem
-        )
+        temp_dir = Path(processed_audio_filepath).parent / Path(processed_audio_filepath).stem
 
         annotation = self.diarization_model(
             str(processed_audio_filepath),
@@ -135,9 +124,7 @@ class LongFormDiarizeService:
 
         return DiarizationOutput(segments=segments)
 
-    def convert_annotation_to_segments(
-        self, annotation
-    ) -> List[Tuple[float, float, int]]:
+    def convert_annotation_to_segments(self, annotation: Annotation) -> list[tuple[float, float, int]]:
         """
         Convert annotation to segments.
 
@@ -151,7 +138,7 @@ class LongFormDiarizeService:
         speaker_mapping = {}
         current_speaker_id = 0
 
-        for segment, track in annotation._tracks.items():
+        for segment, track in annotation._tracks.items():  # noqa: SLF001
             speaker_label = track["_"]
             if speaker_label not in speaker_mapping:
                 speaker_mapping[speaker_label] = current_speaker_id
@@ -166,9 +153,7 @@ class LongFormDiarizeService:
         return segments
 
     @staticmethod
-    def get_contiguous_timestamps(
-        stamps: List[Tuple[float, float, int]]
-    ) -> List[Tuple[float, float, int]]:
+    def get_contiguous_timestamps(stamps: list[tuple[float, float, int]]) -> list[tuple[float, float, int]]:
         """
         Return contiguous timestamps.
 
@@ -196,9 +181,7 @@ class LongFormDiarizeService:
         return contiguous_timestamps
 
     @staticmethod
-    def merge_timestamps(
-        stamps: List[Tuple[float, float, int]]
-    ) -> List[Tuple[float, float, int]]:
+    def merge_timestamps(stamps: list[tuple[float, float, int]]) -> list[tuple[float, float, int]]:
         """
         Merge timestamps of the same speaker.
 

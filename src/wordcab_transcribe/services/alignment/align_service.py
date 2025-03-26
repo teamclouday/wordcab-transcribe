@@ -4,13 +4,15 @@ C. Max Bain
 
 Inspired by: https://github.com/m-bain/whisperX
 """
+
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable, List, Union
 
 import numpy as np
 import pandas as pd
 import torch
 import torchaudio
+from loguru import logger
 from nltk.tokenize.punkt import PunktParameters, PunktSentenceTokenizer
 from transformers import Wav2Vec2ForCTC, Wav2Vec2Processor
 
@@ -53,7 +55,7 @@ DEFAULT_ALIGN_MODELS_HF = {
 }
 
 
-def fill_missing_words(sentence_data, default_probability=0.5):
+def fill_missing_words(sentence_data: dict, default_probability: float = 0.5) -> dict:
     """
     Fills in missing word lists in sentence data using estimated timings and default probabilities.
 
@@ -65,7 +67,7 @@ def fill_missing_words(sentence_data, default_probability=0.5):
         dict: The updated sentence data with filled-in words.
     """
 
-    def estimate_word_timings(text, start, end):
+    def estimate_word_timings(text: str, start: int, end: int) -> list:
         """
         Estimates start and end times for each word in the text based on the total duration and character count.
         """
@@ -96,9 +98,7 @@ def fill_missing_words(sentence_data, default_probability=0.5):
         sentence_end = sentence_data["end"]
 
         # Estimate word timings
-        estimated_words = estimate_word_timings(
-            sentence_text, sentence_start, sentence_end
-        )
+        estimated_words = estimate_word_timings(sentence_text, sentence_start, sentence_end)
 
         # Assign default probability to each word
         for word_info in estimated_words:
@@ -109,7 +109,7 @@ def fill_missing_words(sentence_data, default_probability=0.5):
     return sentence_data
 
 
-def estimate_none_timestamps(timestamp_list):
+def estimate_none_timestamps(timestamp_list: list) -> list:
     """
     Estimates missing timestamps in a list of timestamp segments based on the character length of segment times.
 
@@ -130,10 +130,9 @@ def estimate_none_timestamps(timestamp_list):
             total_duration += duration
             total_characters += characters
 
-    if total_characters > 0:
-        avg_duration_per_char = total_duration / total_characters
-    else:
-        avg_duration_per_char = 0.1  # Default duration per character (assumed)
+    avg_duration_per_char = (
+        total_duration / total_characters if total_characters > 0 else 0.1
+    )  # Default duration per character (assumed)
 
     for i, segment in enumerate(timestamp_list):
         start, end = segment["timestamp"]
@@ -152,7 +151,12 @@ def estimate_none_timestamps(timestamp_list):
     return timestamp_list
 
 
-def load_align_model(language_code, device, model_name=None, model_dir=None):
+def load_align_model(
+    language_code: str,
+    device: str,
+    model_name: str | None = None,
+    model_dir: str | None = None,
+) -> tuple[Wav2Vec2ForCTC, dict]:
     if model_name is None:
         # use default model
         if language_code in DEFAULT_ALIGN_MODELS_TORCH:
@@ -160,13 +164,13 @@ def load_align_model(language_code, device, model_name=None, model_dir=None):
         elif language_code in DEFAULT_ALIGN_MODELS_HF:
             model_name = DEFAULT_ALIGN_MODELS_HF[language_code]
         else:
-            print(
+            logger.error(
                 "There is no default alignment model set for this language"
                 f" ({language_code}).                Please find a wav2vec2.0 model"
                 " finetuned on this language in https://huggingface.co/models, then"
-                " pass the model name in --align_model [MODEL_NAME]"
+                " pass the model name in --align_model [MODEL_NAME]",
             )
-            raise ValueError(f"No default align-model for language: {language_code}")
+            raise ValueError(f"No default align-model for language: {language_code}")  # noqa: TRY003 EM102
 
     if model_name in torchaudio.pipelines.__all__:
         pipeline_type = "torchaudio"
@@ -179,18 +183,16 @@ def load_align_model(language_code, device, model_name=None, model_dir=None):
             processor = Wav2Vec2Processor.from_pretrained(model_name)
             align_model = Wav2Vec2ForCTC.from_pretrained(model_name)
         except Exception as e:
-            print(e)
-            print(
+            logger.exception(e)
+            logger.error(
                 "Error loading model from huggingface, check"
-                " https://huggingface.co/models for finetuned wav2vec2.0 models"
+                " https://huggingface.co/models for finetuned wav2vec2.0 models",
             )
             raise ValueError from e
         pipeline_type = "huggingface"
         align_model = align_model.to(device)
         labels = processor.tokenizer.get_vocab()
-        align_dictionary = {
-            char.lower(): code for char, code in processor.tokenizer.get_vocab().items()
-        }
+        align_dictionary = {char.lower(): code for char, code in processor.tokenizer.get_vocab().items()}
 
     align_metadata = {
         "language": language_code,
@@ -201,11 +203,11 @@ def load_align_model(language_code, device, model_name=None, model_dir=None):
     return align_model, align_metadata
 
 
-def align(
+def align(  # noqa: PLR0913 PLR0912 PLR0915
     transcript: Iterable,
     model: torch.nn.Module,
     align_model_metadata: dict,
-    audio: Union[np.ndarray, torch.Tensor],
+    audio: np.ndarray | torch.Tensor,
     device: str,
     sample_rate: int = 16000,
     interpolate_method: str = "nearest",
@@ -224,7 +226,7 @@ def align(
     if len(audio.shape) == 1:
         audio = audio.unsqueeze(0)
 
-    MAX_DURATION = audio.shape[1] / sample_rate
+    max_duration = audio.shape[1] / sample_rate
 
     model_dictionary = align_model_metadata["dictionary"]
     model_lang = align_model_metadata["language"]
@@ -236,20 +238,15 @@ def align(
         # strip spaces at beginning / end, but keep track of the amount.
         if print_progress:
             base_progress = ((sdx + 1) / total_segments) * 100
-            percent_complete = (
-                (50 + base_progress / 2) if combined_progress else base_progress
-            )
-            print(f"Progress: {percent_complete:.2f}%...")
+            percent_complete = (50 + base_progress / 2) if combined_progress else base_progress
+            logger.debug(f"Progress: {percent_complete:.2f}%...")
 
         num_leading = len(segment["text"]) - len(segment["text"].lstrip())
         num_trailing = len(segment["text"]) - len(segment["text"].rstrip())
         text = segment["text"]
 
         # split into words
-        if model_lang not in LANGUAGES_WITHOUT_SPACES:
-            per_word = text.split(" ")
-        else:
-            per_word = text
+        per_word = text.split(" ") if model_lang not in LANGUAGES_WITHOUT_SPACES else text
 
         clean_char, clean_cdx = [], []
         for cdx, char in enumerate(text):
@@ -259,17 +256,15 @@ def align(
                 char_ = char_.replace(" ", "|")
 
             # ignore whitespace at beginning and end of transcript
-            if cdx < num_leading:
+            if cdx < num_leading or (cdx > len(text) - num_trailing - 1):
                 pass
-            elif cdx > len(text) - num_trailing - 1:
-                pass
-            elif char_ in model_dictionary.keys():
+            elif char_ in model_dictionary:
                 clean_char.append(char_)
                 clean_cdx.append(cdx)
 
         clean_wdx = []
         for wdx, wrd in enumerate(per_word):
-            if any(c in model_dictionary.keys() for c in wrd):
+            if any(c in model_dictionary for c in wrd):
                 clean_wdx.append(wdx)
 
         punkt_param = PunktParameters()
@@ -282,11 +277,11 @@ def align(
         segment["clean_wdx"] = clean_wdx
         segment["sentence_spans"] = sentence_spans
 
-    aligned_segments: List[SingleAlignedSegment] = []
+    aligned_segments: list[SingleAlignedSegment] = []
 
     # 2. Get prediction matrix from alignment model & align
 
-    for sdx, segment in enumerate(transcript):
+    for _, segment in enumerate(transcript):
         t1 = segment["timestamp"][0]
         t2 = segment["timestamp"][1]
         text = segment["text"]
@@ -303,17 +298,17 @@ def align(
 
         # check we can align
         if len(segment["clean_char"]) == 0:
-            print(
+            logger.warning(
                 f'Failed to align segment ("{segment["text"]}"): no characters in this'
-                " segment found in model dictionary, resorting to original..."
+                " segment found in model dictionary, resorting to original...",
             )
             aligned_segments.append(aligned_seg)
             continue
 
-        if t1 >= MAX_DURATION:
-            print(
+        if t1 >= max_duration:
+            logger.warning(
                 f'Failed to align segment ("{segment["text"]}"): original start time'
-                " longer than audio duration, skipping..."
+                " longer than audio duration, skipping...",
             )
             aligned_segments.append(aligned_seg)
             continue
@@ -324,14 +319,12 @@ def align(
         f1 = int(t1 * sample_rate)
         f2 = int(t2 * sample_rate)
 
-        # TODO: Probably can get some speedup gain with batched inference here
+        # NOTE: Probably can get some speedup gain with batched inference here
         waveform_segment = audio[:, f1:f2]
         # Handle the minimum input length for wav2vec2 models
-        if waveform_segment.shape[-1] < 400:
+        if waveform_segment.shape[-1] < 400:  # noqa: PLR2004
             lengths = torch.as_tensor([waveform_segment.shape[-1]]).to(device)
-            waveform_segment = torch.nn.functional.pad(
-                waveform_segment, (0, 400 - waveform_segment.shape[-1])
-            )
+            waveform_segment = torch.nn.functional.pad(waveform_segment, (0, 400 - waveform_segment.shape[-1]))
         else:
             lengths = None
 
@@ -341,26 +334,21 @@ def align(
             elif model_type == "huggingface":
                 emissions = model(waveform_segment.to(device)).logits
             else:
-                raise NotImplementedError(
-                    f"Align model of type {model_type} not supported."
-                )
+                raise NotImplementedError(f"Align model of type {model_type} not supported.")  # noqa: EM102
             emissions = torch.log_softmax(emissions, dim=-1)
 
         emission = emissions[0].cpu().detach()
 
         blank_id = 0
         for char, code in model_dictionary.items():
-            if char == "[pad]" or char == "<pad>":
+            if char in ["[pad]", "<pad>"]:
                 blank_id = code
 
         trellis = get_trellis(emission, tokens, blank_id)
         path = backtrack(trellis, emission, tokens, blank_id)
 
         if path is None:
-            print(
-                f'Failed to align segment ("{segment["text"]}"): backtrack failed,'
-                " resorting to original..."
-            )
+            logger.warning(f'Failed to align segment ("{segment["text"]}"): backtrack failed, resorting to original...')
             aligned_segments.append(aligned_seg)
             continue
 
@@ -387,13 +375,11 @@ def align(
                     "end": end,
                     "score": score,
                     "word-idx": word_idx,
-                }
+                },
             )
 
             # increment word_idx, nltk word tokenization would probably be more robust here, but us space for now...
-            if model_lang in LANGUAGES_WITHOUT_SPACES:
-                word_idx += 1
-            elif cdx == len(text) - 1 or text[cdx + 1] == " ":
+            if model_lang in LANGUAGES_WITHOUT_SPACES or (len(text) - 1 or text[cdx + 1] == " "):
                 word_idx += 1
 
         char_segments_arr = pd.DataFrame(char_segments_arr)
@@ -401,14 +387,12 @@ def align(
         aligned_subsegments = []
         # assign sentence_idx to each character index
         char_segments_arr["sentence-idx"] = None
-        for sdx, (sstart, send) in enumerate(segment["sentence_spans"]):
-            curr_chars = char_segments_arr.loc[
-                (char_segments_arr.index >= sstart) & (char_segments_arr.index <= send)
-            ]
+        for subsdx, (sstart, send) in enumerate(segment["sentence_spans"]):
+            curr_chars = char_segments_arr.loc[(char_segments_arr.index >= sstart) & (char_segments_arr.index <= send)]
             char_segments_arr.loc[
                 (char_segments_arr.index >= sstart) & (char_segments_arr.index <= send),
                 "sentence-idx",
-            ] = sdx
+            ] = subsdx
 
             sentence_text = text[sstart:send]
             sentence_start = curr_chars["start"].min()
@@ -442,20 +426,14 @@ def align(
 
                 if "start" not in word_segment or "end" not in word_segment:
                     if avg_char_duration is None:
-                        df = pd.DataFrame(sentence_words)
-                        df = df.dropna(
-                            subset=["start", "end"]
-                        )  # Drop rows where 'start' or 'end' is NaN
+                        df = pd.DataFrame(sentence_words)  # noqa: PD901
+                        df = df.dropna(subset=["start", "end"])  # Drop rows where 'start' or 'end' is NaN # noqa: PD901
                         if not df.empty:
                             df["duration"] = df["end"] - df["start"]
                             df["char_length"] = df["word"].apply(len)
-                            avg_char_duration = (
-                                df["duration"] / df["char_length"]
-                            ).mean()
+                            avg_char_duration = (df["duration"] / df["char_length"]).mean()
                         else:
-                            avg_char_duration = (
-                                0.1  # Default average character duration
-                            )
+                            avg_char_duration = 0.1  # Default average character duration
 
                     word_len = len(word_segment["word"])
                     estimated_duration = word_len * avg_char_duration
@@ -489,48 +467,39 @@ def align(
                     "start": sentence_start,
                     "end": sentence_end,
                     "words": sentence_words,
-                }
+                },
             )
 
             if return_char_alignments:
                 curr_chars = curr_chars[["char", "start", "end", "score"]]
-                curr_chars.fillna(-1, inplace=True)
+                curr_chars = curr_chars.fillna(-1)
                 curr_chars = curr_chars.to_dict("records")
-                curr_chars = [
-                    {key: val for key, val in char.items() if val != -1}
-                    for char in curr_chars
-                ]
+                curr_chars = [{key: val for key, val in char.items() if val != -1} for char in curr_chars]
                 aligned_subsegments[-1]["chars"] = curr_chars
 
         aligned_subsegments = pd.DataFrame(aligned_subsegments)
-        aligned_subsegments["start"] = interpolate_nans(
-            aligned_subsegments["start"], method=interpolate_method
-        )
-        aligned_subsegments["end"] = interpolate_nans(
-            aligned_subsegments["end"], method=interpolate_method
-        )
+        aligned_subsegments["start"] = interpolate_nans(aligned_subsegments["start"], method=interpolate_method)
+        aligned_subsegments["end"] = interpolate_nans(aligned_subsegments["end"], method=interpolate_method)
         # concatenate sentences with same timestamps
         agg_dict = {"text": " ".join, "words": "sum"}
         if model_lang in LANGUAGES_WITHOUT_SPACES:
             agg_dict["text"] = "".join
         if return_char_alignments:
             agg_dict["chars"] = "sum"
-        aligned_subsegments = aligned_subsegments.groupby(
-            ["start", "end"], as_index=False
-        ).agg(agg_dict)
+        aligned_subsegments = aligned_subsegments.groupby(["start", "end"], as_index=False).agg(agg_dict)
         aligned_subsegments = aligned_subsegments.to_dict("records")
         aligned_segments += aligned_subsegments
 
     # create word_segments list
-    word_segments: List[SingleWordSegment] = []
+    word_segments: list[SingleWordSegment] = []
     for segment in aligned_segments:
         word_segments += segment["words"]
 
     return {"segments": aligned_segments, "word_segments": word_segments}
 
 
-def interpolate_nans(x, method="nearest"):
-    if x.notnull().sum() > 1:
+def interpolate_nans(x: pd.DataFrame, method: str = "nearest") -> pd.DataFrame:
+    if x.notna().sum() > 1:
         return x.interpolate(method=method).ffill().bfill()
     else:
         return x.ffill().bfill()
@@ -541,7 +510,7 @@ source: https://pytorch.org/tutorials/intermediate/forced_alignment_with_torchau
 """
 
 
-def get_trellis(emission, tokens, blank_id=0):
+def get_trellis(emission: torch.Tensor, tokens: list, blank_id: int = 0) -> torch.Tensor:
     num_frame = emission.size(0)
     num_tokens = len(tokens)
 
@@ -571,7 +540,7 @@ class Point:
     score: float
 
 
-def backtrack(trellis, emission, tokens, blank_id=0):
+def backtrack(trellis: torch.Tensor, emission: torch.Tensor, tokens: list, blank_id: int = 0) -> list:
     # Note:
     # j and t are indices for trellis, which has extra dimensions
     # for time and tokens at the beginning.
@@ -616,15 +585,15 @@ class Segment:
     end: int
     score: float
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"{self.label}\t({self.score:4.2f}): [{self.start:5d}, {self.end:5d})"
 
     @property
-    def length(self):
+    def length(self) -> int:
         return self.end - self.start
 
 
-def merge_repeats(path, transcript):
+def merge_repeats(path: list, transcript: list) -> list:
     i1, i2 = 0, 0
     segments = []
     while i1 < len(path):
@@ -637,13 +606,13 @@ def merge_repeats(path, transcript):
                 path[i1].time_index,
                 path[i2 - 1].time_index + 1,
                 score,
-            )
+            ),
         )
         i1 = i2
     return segments
 
 
-def merge_words(segments, separator="|"):
+def merge_words(segments: list, separator: str = "|") -> list:
     words = []
     i1, i2 = 0, 0
     while i1 < len(segments):
@@ -651,12 +620,8 @@ def merge_words(segments, separator="|"):
             if i1 != i2:
                 segs = segments[i1:i2]
                 word = "".join([seg.label for seg in segs])
-                score = sum(seg.score * seg.length for seg in segs) / sum(
-                    seg.length for seg in segs
-                )
-                words.append(
-                    Segment(word, segments[i1].start, segments[i2 - 1].end, score)
-                )
+                score = sum(seg.score * seg.length for seg in segs) / sum(seg.length for seg in segs)
+                words.append(Segment(word, segments[i1].start, segments[i2 - 1].end, score))
             i1 = i2 + 1
             i2 = i1
         else:

@@ -20,9 +20,7 @@
 """Audio url endpoint for the Wordcab Transcribe API."""
 
 import asyncio
-import json
-from datetime import datetime
-from typing import List, Optional, Union
+import contextlib
 
 import shortuuid
 from fastapi import APIRouter, BackgroundTasks, HTTPException
@@ -49,13 +47,13 @@ router = APIRouter()
 async def inference_with_audio_url(
     background_tasks: BackgroundTasks,
     url: str,
-    data: Optional[AudioRequest] = None,
+    data: AudioRequest | None = None,
 ) -> dict:
     """Inference endpoint with audio url."""
     filename = f"audio_url_{shortuuid.ShortUUID().random(length=32)}"
-    data = AudioRequest() if data is None else AudioRequest(**data.dict())
+    data = AudioRequest() if data is None else AudioRequest(**data.model_dump())
 
-    async def process_audio(data):
+    async def process_audio(data: AudioRequest) -> None:
         try:
             async with download_limit:
                 _filepath = await download_audio_file("url", url, filename)
@@ -64,25 +62,21 @@ async def inference_with_audio_url(
                 if (num_channels > 1 and data.multi_channel is False) or (
                     num_channels == 1 and data.multi_channel is True
                 ):
-                    num_channels = (
-                        1  # Force mono channel if more than 1 channel or vice versa
-                    )
-                    new_data = data.dict()
+                    num_channels = 1  # Force mono channel if more than 1 channel or vice versa
+                    new_data = data.model_dump()
                     if data.multi_channel:
                         new_data["diarization"] = True
                     new_data["multi_channel"] = False
                     data = AudioRequest(**new_data)
 
                 try:
-                    filepath: Union[str, List[str]] = await process_audio_file(
-                        _filepath, num_channels=num_channels
-                    )
+                    filepath: str | list[str] = await process_audio_file(_filepath, num_channels=num_channels)
                 except Exception as e:
                     try:
                         background_tasks.add_task(delete_file, filepath=filename)
                         background_tasks.add_task(delete_file, filepath=filepath)
-                    except:
-                        pass
+                    except Exception:
+                        logger.debug("Failed to delete files")
                     raise HTTPException(  # noqa: B904
                         status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
                         detail=f"Process failed: {e}",
@@ -112,7 +106,7 @@ async def inference_with_audio_url(
                         log_prob_threshold=data.log_prob_threshold,
                         no_speech_threshold=data.no_speech_threshold,
                         condition_on_previous_text=data.condition_on_previous_text,
-                    )
+                    ),
                 )
 
                 result = await task
@@ -150,13 +144,11 @@ async def inference_with_audio_url(
             try:
                 background_tasks.add_task(delete_file, filepath=filename)
                 background_tasks.add_task(delete_file, filepath=filepath)
-            except:
-                pass
+            except Exception:
+                logger.debug("Failed to delete files")
             error_message = f"Error during transcription: {e}"
-            try:
+            with contextlib.suppress(Exception):
                 logger.error(result.message)
-            except:
-                pass
             logger.error(error_message)
 
     # Add the process_audio function to background tasks
@@ -164,16 +156,3 @@ async def inference_with_audio_url(
 
     # Return the job name and task token immediately
     return {"job_name": data.job_name, "task_token": data.task_token}
-
-
-def upload_file(s3_client, file, bucket, object_name):
-    try:
-        s3_client.put_object(
-            Body=file,
-            Bucket=bucket,
-            Key=object_name,
-        )
-    except Exception as e:
-        logger.error(f"Exception while uploading results to S3: {e}")
-        return False
-    return True

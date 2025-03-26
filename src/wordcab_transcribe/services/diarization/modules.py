@@ -6,25 +6,25 @@
 # https://github.com/NVIDIA/NeMo/blob/main/nemo/collections/asr/parts/submodules/tdnn_attention.py
 
 import math
-from typing import Callable, Iterable, List, Optional, Tuple
+from collections.abc import Callable, Iterable
+from typing import ClassVar
 
 import torch
-import torch.nn as nn
 from loguru import logger as logging
 from numpy import inf
-from torch import Tensor
+from torch import nn
 from torch.nn import functional as F  # noqa: N812
 from torch.nn.init import _calculate_correct_fan
 
-try:
-    from pytorch_quantization import nn as quant_nn
+# try:
+#     from pytorch_quantization import nn as quant_nn
 
-    PYTORCH_QUANTIZATION_AVAILABLE = True
-except ImportError:
-    PYTORCH_QUANTIZATION_AVAILABLE = False
+#     PYTORCH_QUANTIZATION_AVAILABLE = True
+# except ImportError:
+PYTORCH_QUANTIZATION_AVAILABLE = False
 
 
-def compute_new_kernel_size(kernel_size, kernel_width):
+def compute_new_kernel_size(kernel_size: int, kernel_width: int) -> int:
     """Compute new kernel size based on kernel width."""
     new_kernel_size = max(int(kernel_size * kernel_width), 1)
     # If kernel is even shape, round up to make it odd
@@ -33,10 +33,10 @@ def compute_new_kernel_size(kernel_size, kernel_width):
     return new_kernel_size
 
 
-def get_asymtric_padding(kernel_size, stride, dilation, future_context):
+def get_asymtric_padding(kernel_size: int, stride: int, dilation: int, future_context: int) -> tuple[int, int]:
     """Asymmetric padding for future context."""
     if stride > 1 and dilation > 1:
-        raise ValueError("Only stride OR dilation may be greater than 1")
+        raise ValueError("Only stride OR dilation may be greater than 1")  # noqa: TRY003 EM101
 
     left_context = kernel_size - 1 - future_context
     right_context = future_context
@@ -50,7 +50,7 @@ def get_asymtric_padding(kernel_size, stride, dilation, future_context):
             "Future context window is larger than the kernel size!\nLeft context ="
             f" {left_context} | Right context = greater than {right_context} | Kernel"
             f" size = {kernel_size}\nSwitching to symmetric padding (left context ="
-            f" right context = {symmetric_padding})"
+            f" right context = {symmetric_padding})",
         )
         return symmetric_padding
 
@@ -59,7 +59,7 @@ def get_asymtric_padding(kernel_size, stride, dilation, future_context):
             "Future context window is larger than half the kernel size!\nConv layer"
             " therefore uses more future information than past to compute its"
             f" output!\nLeft context = {left_context} | Right context ="
-            f" {right_context} | Kernel size = {kernel_size}"
+            f" {right_context} | Kernel size = {kernel_size}",
         )
 
     if dilation > 1:
@@ -70,16 +70,19 @@ def get_asymtric_padding(kernel_size, stride, dilation, future_context):
     return (left_context, right_context)
 
 
-def get_same_padding(kernel_size, stride, dilation) -> int:
+def get_same_padding(kernel_size: int, stride: int, dilation: int) -> int:
     """Same padding calculation."""
     if stride > 1 and dilation > 1:
-        raise ValueError("Only stride OR dilation may be greater than 1")
+        raise ValueError("Only stride OR dilation may be greater than 1")  # noqa: TRY003 EM101
     return (dilation * (kernel_size - 1)) // 2
 
 
 def get_statistics_with_mask(
-    x: torch.Tensor, m: torch.Tensor, dim: int = 2, eps: float = 1e-10
-):
+    x: torch.Tensor,
+    m: torch.Tensor,
+    dim: int = 2,
+    eps: float = 1e-10,
+) -> tuple[torch.Tensor, torch.Tensor]:
     """
     Compute mean and standard deviation of input(x) provided with its masking labels (m).
 
@@ -95,7 +98,10 @@ def get_statistics_with_mask(
     return mean, std
 
 
-def init_weights(m, mode: Optional[str] = "xavier_uniform"):  # noqa: C901
+def init_weights(  # noqa: PLR0912
+    m: "MaskedConv1d | nn.Conv1d | nn.Linear | nn.BatchNorm1d",
+    mode: str | None = "xavier_uniform",
+) -> None:
     """Initialize weights of the model."""
     if isinstance(m, MaskedConv1d):
         init_weights(m.conv, mode)
@@ -114,7 +120,7 @@ def init_weights(m, mode: Optional[str] = "xavier_uniform"):  # noqa: C901
             elif mode == "tds_normal":
                 tds_normal_(m.weight)
             else:
-                raise ValueError(f"Unknown Initialization mode: {mode}")
+                raise ValueError(f"Unknown Initialization mode: {mode}")  # noqa: TRY003 EM102
     elif isinstance(m, nn.BatchNorm1d):
         if m.track_running_stats:
             m.running_mean.zero_()
@@ -125,7 +131,11 @@ def init_weights(m, mode: Optional[str] = "xavier_uniform"):  # noqa: C901
             nn.init.zeros_(m.bias)
 
 
-def lens_to_mask(lens: List[int], max_len: int, device: str = None):
+def lens_to_mask(
+    lens: torch.Tensor,
+    max_len: int,
+    device: torch.device | None = None,
+) -> tuple[torch.Tensor, torch.Tensor]:
     """Outputs masking labels.
 
     Outputs masking labels for list of lengths of audio features, with max length of any
@@ -147,8 +157,10 @@ def lens_to_mask(lens: List[int], max_len: int, device: str = None):
 
 @torch.jit.script
 def _masked_conv_init_lens(
-    lens: torch.Tensor, current_maxlen: int, original_maxlen: torch.Tensor
-):
+    lens: torch.Tensor,
+    current_maxlen: torch.Tensor,
+    original_maxlen: torch.Tensor,
+) -> tuple[torch.Tensor, torch.Tensor]:
     """Masked Conv Init Lens."""
     if current_maxlen > original_maxlen:
         new_lens = torch.arange(current_maxlen)
@@ -167,11 +179,7 @@ def make_seq_mask_like(
     time_dim: int = -1,
 ) -> torch.Tensor:
     """Make sequence mask like."""
-    mask = (
-        torch.arange(like.shape[time_dim], device=like.device)
-        .repeat(lengths.shape[0], 1)
-        .lt(lengths.unsqueeze(-1))
-    )
+    mask = torch.arange(like.shape[time_dim], device=like.device).repeat(lengths.shape[0], 1).lt(lengths.unsqueeze(-1))
     # Match number of dims in `like` tensor
     for _ in range(like.dim() - mask.dim()):
         mask = mask.unsqueeze(1)
@@ -184,9 +192,7 @@ def make_seq_mask_like(
 
 
 @torch.jit.script
-def _se_pool_step_script_infer(
-    x: torch.Tensor, context_window: int, mask: torch.Tensor
-):
+def _se_pool_step_script_infer(x: torch.Tensor, context_window: int, mask: torch.Tensor) -> torch.Tensor:
     """
     Calculates the masked average over padded limited context segment during inference mode.
 
@@ -200,9 +206,7 @@ def _se_pool_step_script_infer(
     """
     timesteps = x.shape[-1]
     if timesteps < context_window:
-        y = torch.sum(x, dim=-1, keepdim=True) / mask.sum(dim=-1, keepdim=True).to(
-            x.dtype
-        )
+        y = torch.sum(x, dim=-1, keepdim=True) / mask.sum(dim=-1, keepdim=True).to(x.dtype)
     else:
         # << During inference prefer to use entire context >>
         # x = x[:, :, :context_window]  # [B, C, context_window]
@@ -211,17 +215,13 @@ def _se_pool_step_script_infer(
         # mask = mask.sum(dim=-1, keepdim=True).to(x.dtype)  # [B, C, 1]
         # y = x.sum(dim=-1, keepdim=True)  # [B, 1, 1]
         # y = y / (mask + 1e-8)  # [B, C, 1]
-        y = torch.sum(x, dim=-1, keepdim=True) / mask.sum(dim=-1, keepdim=True).to(
-            x.dtype
-        )
+        y = torch.sum(x, dim=-1, keepdim=True) / mask.sum(dim=-1, keepdim=True).to(x.dtype)
 
     return y
 
 
 @torch.jit.script
-def _se_pool_step_script_train(
-    x: torch.Tensor, context_window: int, mask: torch.Tensor
-):
+def _se_pool_step_script_train(x: torch.Tensor, context_window: int, mask: torch.Tensor) -> torch.Tensor:
     """Calculates the masked average over padded limited context segment during training mode.
 
     Randomly slices a segment of length `context_window` from signal+padded input tensor across all channels and
@@ -237,17 +237,11 @@ def _se_pool_step_script_train(
     """
     timesteps = x.shape[-1]
     if timesteps < context_window:
-        y = torch.sum(x, dim=-1, keepdim=True) / mask.sum(dim=-1, keepdim=True).to(
-            x.dtype
-        )
+        y = torch.sum(x, dim=-1, keepdim=True) / mask.sum(dim=-1, keepdim=True).to(x.dtype)
     else:
-        start_idx = torch.randint(
-            0, timesteps - context_window, size=[1], dtype=torch.int32
-        )[0]
+        start_idx = torch.randint(0, timesteps - context_window, size=[1], dtype=torch.int32)[0]
         x = x[:, :, start_idx : (start_idx + context_window)]  # [B, C, context_window]
-        mask = mask[
-            :, :, start_idx : (start_idx + context_window)
-        ]  # [B, 1, context_window]
+        mask = mask[:, :, start_idx : (start_idx + context_window)]  # [B, 1, context_window]
 
         mask = mask.sum(dim=-1, keepdim=True).to(x.dtype)  # [B, C, 1]
         y = x.sum(dim=-1, keepdim=True)  # [B, 1, 1]
@@ -256,7 +250,7 @@ def _se_pool_step_script_train(
     return y
 
 
-def tds_uniform_(tensor, mode="fan_in"):
+def tds_uniform_(tensor: torch.Tensor, mode: str = "fan_in") -> torch.Tensor:
     r"""TDS Uniform Initialization.
 
     Uniform Initialization from the paper
@@ -281,7 +275,7 @@ def tds_uniform_(tensor, mode="fan_in"):
         return tensor.uniform_(-bound, bound)
 
 
-def tds_normal_(tensor, mode="fan_in"):
+def tds_normal_(tensor: torch.Tensor, mode: str = "fan_in") -> torch.Tensor:
     r"""TDS Normal.
 
     Normal Initialization from the paper
@@ -309,27 +303,27 @@ def tds_normal_(tensor, mode="fan_in"):
 class MaskedConv1d(nn.Module):
     """Masked Convolution Module."""
 
-    __constants__ = ["use_conv_mask", "real_out_channels", "heads"]
+    __constants__: ClassVar[list] = ["use_conv_mask", "real_out_channels", "heads"]
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
-        in_channels,
-        out_channels,
-        kernel_size,
-        stride=1,
-        padding=0,
-        dilation=1,
-        groups=1,
-        heads=-1,
-        bias=False,
-        use_mask=True,
-        quantize=False,
-    ):
+        in_channels: int,
+        out_channels: int,
+        kernel_size: int,
+        stride: int = 1,
+        padding: int = 0,
+        dilation: int = 1,
+        groups: int = 1,
+        heads: int = -1,
+        bias: bool = False,
+        use_mask: bool = True,
+        quantize: bool = False,
+    ) -> None:
         """Initialize the module."""
         super().__init__()
 
         if not (heads == -1 or groups == in_channels):
-            raise ValueError("Only use heads for depthwise convolutions")
+            raise ValueError("Only use heads for depthwise convolutions")  # noqa: TRY003 EM101
 
         self.real_out_channels = out_channels
         if heads != -1:
@@ -348,47 +342,34 @@ class MaskedConv1d(nn.Module):
         else:
             self.pad_layer = None
 
-        if PYTORCH_QUANTIZATION_AVAILABLE and quantize:
-            self.conv = quant_nn.QuantConv1d(
-                in_channels,
-                out_channels,
-                kernel_size,
-                stride=stride,
-                padding=padding,
-                dilation=dilation,
-                groups=groups,
-                bias=bias,
+        if not PYTORCH_QUANTIZATION_AVAILABLE and quantize:
+            raise ImportError(  # noqa: TRY003
+                "pytorch-quantization is not installed. Install from "  # noqa: EM101
+                "https://github.com/NVIDIA/TensorRT/tree/master/tools/pytorch-quantization.",
             )
-        elif not PYTORCH_QUANTIZATION_AVAILABLE and quantize:
-            raise ImportError(
-                "pytorch-quantization is not installed. Install from "
-                "https://github.com/NVIDIA/TensorRT/tree/master/tools/pytorch-quantization."
-            )
-        else:
-            self.conv = nn.Conv1d(
-                in_channels,
-                out_channels,
-                kernel_size,
-                stride=stride,
-                padding=padding,
-                dilation=dilation,
-                groups=groups,
-                bias=bias,
-            )
+
+        self.conv = nn.Conv1d(
+            in_channels,
+            out_channels,
+            kernel_size,
+            stride=stride,
+            padding=padding,
+            dilation=dilation,
+            groups=groups,
+            bias=bias,
+        )
         self.use_mask = use_mask
         self.heads = heads
 
         # Calculations for "same" padding cache
         self.same_padding = (self.conv.stride[0] == 1) and (
-            2 * self.conv.padding[0]
-            == self.conv.dilation[0] * (self.conv.kernel_size[0] - 1)
+            2 * self.conv.padding[0] == self.conv.dilation[0] * (self.conv.kernel_size[0] - 1)
         )
         if self.pad_layer is None:
             self.same_padding_asymmetric = False
         else:
             self.same_padding_asymmetric = (self.conv.stride[0] == 1) and (
-                sum(self._padding)
-                == self.conv.dilation[0] * (self.conv.kernel_size[0] - 1)
+                sum(self._padding) == self.conv.dilation[0] * (self.conv.kernel_size[0] - 1)
             )
 
         # `self.lens` caches consecutive integers from 0 to `self.max_len` that are used to compute the mask for a
@@ -397,7 +378,7 @@ class MaskedConv1d(nn.Module):
             self.max_len = torch.tensor(0)
             self.lens = torch.tensor(0)
 
-    def get_seq_len(self, lens):
+    def get_seq_len(self, lens: torch.Tensor) -> torch.Tensor:
         """Get sequence length after convolution."""
         if self.same_padding or self.same_padding_asymmetric:
             return lens
@@ -405,10 +386,7 @@ class MaskedConv1d(nn.Module):
         if self.pad_layer is None:
             return (
                 torch.div(
-                    lens
-                    + 2 * self.conv.padding[0]
-                    - self.conv.dilation[0] * (self.conv.kernel_size[0] - 1)
-                    - 1,
+                    lens + 2 * self.conv.padding[0] - self.conv.dilation[0] * (self.conv.kernel_size[0] - 1) - 1,
                     self.conv.stride[0],
                     rounding_mode="trunc",
                 )
@@ -417,17 +395,14 @@ class MaskedConv1d(nn.Module):
         else:
             return (
                 torch.div(
-                    lens
-                    + sum(self._padding)
-                    - self.conv.dilation[0] * (self.conv.kernel_size[0] - 1)
-                    - 1,
+                    lens + sum(self._padding) - self.conv.dilation[0] * (self.conv.kernel_size[0] - 1) - 1,
                     self.conv.stride[0],
                     rounding_mode="trunc",
                 )
                 + 1
             )
 
-    def forward(self, x, lens):
+    def forward(self, x: torch.Tensor, lens: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """Forward pass."""
         if self.use_mask:
             # Generally will be called by ConvASREncoder, but kept as single gpu backup.
@@ -453,36 +428,38 @@ class MaskedConv1d(nn.Module):
 
         return out, lens
 
-    def update_masked_length(self, max_len, seq_range=None, device=None):
+    def update_masked_length(
+        self,
+        max_len: torch.Tensor,
+        seq_range: torch.Tensor | None = None,
+        device: torch.device | None = None,
+    ) -> None:
         """Updates the cached masked length."""
         if seq_range is None:
-            self.lens, self.max_len = _masked_conv_init_lens(
-                self.lens, max_len, self.max_len
-            )
+            self.lens, self.max_len = _masked_conv_init_lens(self.lens, max_len, self.max_len)
             self.lens = self.lens.to(device)
         else:
             self.lens = seq_range
             self.max_len = max_len
 
-    def mask_input(self, x, lens):
+    def mask_input(self, x: torch.Tensor, lens: torch.Tensor) -> torch.Tensor:
         """Mask input."""
         max_len = x.size(2)
         mask = self.lens[:max_len].unsqueeze(0).to(lens.device) < lens.unsqueeze(1)
-        x = x * mask.unsqueeze(1).to(device=x.device)
-        return x
+        return x * mask.unsqueeze(1).to(device=x.device)
 
 
 class GroupShuffle(nn.Module):
     """Group Shuffle Module."""
 
-    def __init__(self, groups, channels):
+    def __init__(self, groups: int, channels: int) -> None:
         """Initialize the module."""
         super().__init__()
 
         self.groups = groups
         self.channels_per_group = channels // groups
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward pass."""
         sh = x.shape
 
@@ -490,23 +467,21 @@ class GroupShuffle(nn.Module):
 
         x = torch.transpose(x, 1, 2).contiguous()
 
-        x = x.view(-1, self.groups * self.channels_per_group, sh[-1])
-
-        return x
+        return x.view(-1, self.groups * self.channels_per_group, sh[-1])
 
 
 class SqueezeExcite(nn.Module):
     """Squeeze Excite Module."""
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         channels: int,
         reduction_ratio: int,
         context_window: int = -1,
         interpolation_mode: str = "nearest",
-        activation: Optional[Callable] = None,
+        activation: Callable | None = None,
         quantize: bool = False,
-    ):
+    ) -> None:
         """
         Squeeze-and-Excitation sub-module.
 
@@ -533,23 +508,17 @@ class SqueezeExcite(nn.Module):
         if activation is None:
             activation = nn.ReLU(inplace=True)
 
-        if PYTORCH_QUANTIZATION_AVAILABLE and quantize:
-            self.fc = nn.Sequential(
-                quant_nn.QuantLinear(channels, channels // reduction_ratio, bias=False),
-                activation,
-                quant_nn.QuantLinear(channels // reduction_ratio, channels, bias=False),
+        if not PYTORCH_QUANTIZATION_AVAILABLE and quantize:
+            raise ImportError(  # noqa: TRY003
+                "pytorch-quantization is not installed. Install from "  # noqa: EM101
+                "https://github.com/NVIDIA/TensorRT/tree/master/tools/pytorch-quantization.",
             )
-        elif not PYTORCH_QUANTIZATION_AVAILABLE and quantize:
-            raise ImportError(
-                "pytorch-quantization is not installed. Install from "
-                "https://github.com/NVIDIA/TensorRT/tree/master/tools/pytorch-quantization."
-            )
-        else:
-            self.fc = nn.Sequential(
-                nn.Linear(channels, channels // reduction_ratio, bias=False),
-                activation,
-                nn.Linear(channels // reduction_ratio, channels, bias=False),
-            )
+
+        self.fc = nn.Sequential(
+            nn.Linear(channels, channels // reduction_ratio, bias=False),
+            activation,
+            nn.Linear(channels // reduction_ratio, channels, bias=False),
+        )
         self.gap = nn.AdaptiveAvgPool1d(1)
 
         # Set default context window
@@ -558,11 +527,11 @@ class SqueezeExcite(nn.Module):
         # Set default max sequence length
         self.set_max_len(16)
 
-    def forward(self, x, lengths):
+    def forward(self, x: torch.Tensor, lengths: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """Forward pass."""
         return self.forward_for_export(x, lengths)
 
-    def forward_for_export(self, x, lengths):
+    def forward_for_export(self, x: torch.Tensor, lengths: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """Forward pass for export."""
         # The use of negative indices on the transpose allow for expanded SqueezeExcite
         max_len = x.shape[-1]
@@ -572,9 +541,7 @@ class SqueezeExcite(nn.Module):
         # Computes in float32 to avoid instabilities during training with AMP.
         with torch.cuda.amp.autocast(enabled=False):
             # Create sample mask - 1 represents value, 0 represents pad
-            mask = self.make_pad_mask(
-                lengths, max_audio_length=max_len, device=x.device
-            )
+            mask = self.make_pad_mask(lengths, max_audio_length=max_len, device=x.device)
             mask = ~mask  # 0 represents value, 1 represents pad
             x = x.float()  # For stable AMP, SE must be computed at fp32.
             x.masked_fill_(mask, 0.0)  # mask padded values explicitly to 0
@@ -591,27 +558,25 @@ class SqueezeExcite(nn.Module):
             y = x * y
         return y, lengths
 
-    def _se_pool_step(self, x, mask):
+    def _se_pool_step(self, x: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
         """Performs the Squeeze and Excitation pooling step."""
         # Negate mask back to represent 1 for signal and 0 for padded timestep.
         mask = ~mask
 
         if self.context_window < 0:
             # [B, C, 1] - Masked Average over value + padding.
-            y = torch.sum(x, dim=-1, keepdim=True) / mask.sum(
-                dim=-1, keepdim=True
-            ).type(x.dtype)
+            y = torch.sum(x, dim=-1, keepdim=True) / mask.sum(dim=-1, keepdim=True).type(x.dtype)
+
+        # [B, C, 1] - Masked Average over value + padding with limited context.
+        # During training randomly subsegments a context_window chunk of timesteps.
+        # During inference selects only the first context_window chunk of timesteps.
+        elif self.training:
+            y = _se_pool_step_script_train(x, self.context_window, mask)
         else:
-            # [B, C, 1] - Masked Average over value + padding with limited context.
-            # During training randomly subsegments a context_window chunk of timesteps.
-            # During inference selects only the first context_window chunk of timesteps.
-            if self.training:
-                y = _se_pool_step_script_train(x, self.context_window, mask)
-            else:
-                y = _se_pool_step_script_infer(x, self.context_window, mask)
+            y = _se_pool_step_script_infer(x, self.context_window, mask)
         return y
 
-    def set_max_len(self, max_len, seq_range=None):
+    def set_max_len(self, max_len: torch.Tensor, seq_range: torch.Tensor | None = None) -> None:
         """Sets maximum input length.
 
         Pre-calculates internal seq_range mask.
@@ -625,23 +590,22 @@ class SqueezeExcite(nn.Module):
         else:
             self.register_buffer("seq_range", seq_range, persistent=False)
 
-    def make_pad_mask(self, seq_lens, max_audio_length, device=None):
+    def make_pad_mask(
+        self,
+        seq_lens: torch.Tensor,
+        max_audio_length: int,
+        device: torch.device | None = None,
+    ) -> torch.Tensor:
         """Make masking for padding."""
         if device and self.seq_range.device != device:
             self.seq_range = self.seq_range.to(device)
         if self.seq_range.device != seq_lens.device:
             seq_lens = seq_lens.to(self.seq_range.device)
 
-        mask = self.seq_range[:max_audio_length].expand(
-            seq_lens.size(0), -1
-        ) < seq_lens.unsqueeze(
-            -1
-        )  # [B, T]; bool
-        mask = mask.unsqueeze(1)  # [B, 1, T]
+        mask = self.seq_range[:max_audio_length].expand(seq_lens.size(0), -1) < seq_lens.unsqueeze(-1)  # [B, T]; bool
+        return mask.unsqueeze(1)  # [B, 1, T]
 
-        return mask
-
-    def change_context_window(self, context_window: int):
+    def change_context_window(self, context_window: int) -> None:
         """Update the context window of the SqueezeExcitation module, in-place if possible.
 
         Will update the pooling layer to either nn.AdaptiveAvgPool1d() (for global SE) or nn.AvgPool1d()
@@ -658,10 +622,7 @@ class SqueezeExcite(nn.Module):
                 of context to compute the Squeeze step.
         """
         if hasattr(self, "context_window"):
-            logging.info(
-                "Changing Squeeze-Excitation context window from"
-                f" {self.context_window} to {context_window}"
-            )
+            logging.info(f"Changing Squeeze-Excitation context window from {self.context_window} to {context_window}")
 
         self.context_window = context_window
 
@@ -726,58 +687,54 @@ class JasperBlock(nn.Module):
         layer_idx (int, optional): can be specified to allow layer output capture for InterCTC loss. Defaults to -1.
     """
 
-    __constants__ = ["conv_mask", "separable", "residual_mode", "res", "mconv"]
+    __constants__: ClassVar[list] = ["conv_mask", "separable", "residual_mode", "res", "mconv"]
 
-    def __init__(  # noqa: C901
+    def __init__(  # noqa: PLR0913
         self,
-        inplanes,
-        planes,
-        repeat=3,
-        kernel_size=11,
-        kernel_size_factor=1,
-        stride=1,
-        dilation=1,
-        padding="same",
-        dropout=0.2,
-        activation=None,
-        residual=True,
-        groups=1,
-        separable=False,
-        heads=-1,
-        normalization="batch",
-        norm_groups=1,
-        residual_mode="add",
-        residual_panes=[],  # noqa: B006
-        conv_mask=False,
-        se=False,
-        se_reduction_ratio=16,
-        se_context_window=-1,
-        se_interpolation_mode="nearest",
-        stride_last=False,
+        inplanes: int,
+        planes: int,
+        repeat: int = 3,
+        kernel_size: int = 11,
+        kernel_size_factor: int = 1,
+        stride: int = 1,
+        dilation: int = 1,
+        padding: str = "same",
+        dropout: float = 0.2,
+        activation: nn.Module | None = None,
+        residual: bool = True,
+        groups: int = 1,
+        separable: bool = False,
+        heads: int = -1,
+        normalization: str = "batch",
+        norm_groups: int = 1,
+        residual_mode: str = "add",
+        residual_panes: list = [],  # noqa: B006
+        conv_mask: bool = False,
+        se: bool = False,
+        se_reduction_ratio: int = 16,
+        se_context_window: int = -1,
+        se_interpolation_mode: str = "nearest",
+        stride_last: bool = False,
         future_context: int = -1,
-        quantize=False,
+        quantize: bool = False,
         layer_idx: int = -1,  # only used for capturing tensors for interctc loss
-    ):
+    ) -> None:
         """Constructs a Jasper Block."""
         super().__init__()
 
         if padding != "same":
-            raise ValueError("currently only 'same' padding is supported")
+            raise ValueError("currently only 'same' padding is supported")  # noqa: TRY003 EM101
 
         kernel_size_factor = float(kernel_size_factor)
         if isinstance(kernel_size, Iterable):
-            kernel_size = [
-                compute_new_kernel_size(k, kernel_size_factor) for k in kernel_size
-            ]
+            kernel_size = [compute_new_kernel_size(k, kernel_size_factor) for k in kernel_size]
         else:
             kernel_size = [compute_new_kernel_size(kernel_size, kernel_size_factor)]
 
         if future_context < 0:
             padding_val = get_same_padding(kernel_size[0], stride[0], dilation[0])
         else:
-            padding_val = get_asymtric_padding(
-                kernel_size[0], stride[0], dilation[0], future_context
-            )
+            padding_val = get_asymtric_padding(kernel_size[0], stride[0], dilation[0], future_context)
 
         self.inplanes = inplanes
         self.planes = planes
@@ -795,10 +752,7 @@ class JasperBlock(nn.Module):
 
         for _ in range(repeat - 1):
             # Stride last means only the last convolution in block will have stride
-            if stride_last:
-                stride_val = [1]
-            else:
-                stride_val = stride
+            stride_val = [1] if stride_last else stride
 
             conv.extend(
                 self._get_conv_bn_layer(
@@ -814,12 +768,10 @@ class JasperBlock(nn.Module):
                     normalization=normalization,
                     norm_groups=norm_groups,
                     quantize=quantize,
-                )
+                ),
             )
 
-            conv.extend(
-                self._get_act_dropout_layer(drop_prob=dropout, activation=activation)
-            )
+            conv.extend(self._get_act_dropout_layer(drop_prob=dropout, activation=activation))
 
             inplanes_loop = planes
 
@@ -837,7 +789,7 @@ class JasperBlock(nn.Module):
                 normalization=normalization,
                 norm_groups=norm_groups,
                 quantize=quantize,
-            )
+            ),
         )
 
         if se:
@@ -849,7 +801,7 @@ class JasperBlock(nn.Module):
                     interpolation_mode=se_interpolation_mode,
                     activation=activation,
                     quantize=quantize,
-                )
+                ),
             )
 
         self.mconv = conv
@@ -859,11 +811,7 @@ class JasperBlock(nn.Module):
 
         if residual:
             res_list = nn.ModuleList()
-
-            if residual_mode == "stride_add":
-                stride_val = stride
-            else:
-                stride_val = [1]
+            stride_val = [1] if residual_mode == "stride_add" else stride
 
             if len(residual_panes) == 0:
                 res_panes = [inplanes]
@@ -878,42 +826,36 @@ class JasperBlock(nn.Module):
                         norm_groups=norm_groups,
                         stride=stride_val,
                         quantize=quantize,
-                    )
+                    ),
                 )
 
                 res_list.append(res)
 
             self.res = res_list
-            if PYTORCH_QUANTIZATION_AVAILABLE and self.quantize:
-                self.residual_quantizer = quant_nn.TensorQuantizer(
-                    quant_nn.QuantConv2d.default_quant_desc_input
-                )
-            elif not PYTORCH_QUANTIZATION_AVAILABLE and quantize:
-                raise ImportError(
-                    "pytorch-quantization is not installed. Install from "
-                    "https://github.com/NVIDIA/TensorRT/tree/master/tools/pytorch-quantization."
+            if not PYTORCH_QUANTIZATION_AVAILABLE and quantize:
+                raise ImportError(  # noqa: TRY003
+                    "pytorch-quantization is not installed. Install from "  # noqa: EM101
+                    "https://github.com/NVIDIA/TensorRT/tree/master/tools/pytorch-quantization.",
                 )
         else:
             self.res = None
 
-        self.mout = nn.Sequential(
-            *self._get_act_dropout_layer(drop_prob=dropout, activation=activation)
-        )
+        self.mout = nn.Sequential(*self._get_act_dropout_layer(drop_prob=dropout, activation=activation))
 
-    def _get_conv(
+    def _get_conv(  # noqa: PLR0913
         self,
-        in_channels,
-        out_channels,
-        kernel_size=11,
-        stride=1,
-        dilation=1,
-        padding=0,
-        bias=False,
-        groups=1,
-        heads=-1,
-        separable=False,
-        quantize=False,
-    ):
+        in_channels: int,
+        out_channels: int,
+        kernel_size: int = 11,
+        stride: int = 1,
+        dilation: int = 1,
+        padding: int = 0,
+        bias: bool = False,
+        groups: int = 1,
+        heads: int = -1,
+        _separable: bool = False,
+        quantize: bool = False,
+    ) -> nn.Module:
         """Get convolution layer."""
         use_mask = self.conv_mask
         if use_mask:
@@ -930,51 +872,39 @@ class JasperBlock(nn.Module):
                 use_mask=use_mask,
                 quantize=quantize,
             )
-        else:
-            if PYTORCH_QUANTIZATION_AVAILABLE and quantize:
-                return quant_nn.QuantConv1d(
-                    in_channels,
-                    out_channels,
-                    kernel_size,
-                    stride=stride,
-                    dilation=dilation,
-                    padding=padding,
-                    bias=bias,
-                    groups=groups,
-                )
-            elif not PYTORCH_QUANTIZATION_AVAILABLE and quantize:
-                raise ImportError(
-                    "pytorch-quantization is not installed. Install from "
-                    "https://github.com/NVIDIA/TensorRT/tree/master/tools/pytorch-quantization."
-                )
-            else:
-                return nn.Conv1d(
-                    in_channels,
-                    out_channels,
-                    kernel_size,
-                    stride=stride,
-                    dilation=dilation,
-                    padding=padding,
-                    bias=bias,
-                    groups=groups,
-                )
 
-    def _get_conv_bn_layer(
+        if not PYTORCH_QUANTIZATION_AVAILABLE and quantize:
+            raise ImportError(  # noqa: TRY003
+                "pytorch-quantization is not installed. Install from "  # noqa: EM101
+                "https://github.com/NVIDIA/TensorRT/tree/master/tools/pytorch-quantization.",
+            )
+        return nn.Conv1d(
+            in_channels,
+            out_channels,
+            kernel_size,
+            stride=stride,
+            dilation=dilation,
+            padding=padding,
+            bias=bias,
+            groups=groups,
+        )
+
+    def _get_conv_bn_layer(  # noqa: PLR0913
         self,
-        in_channels,
-        out_channels,
-        kernel_size=11,
-        stride=1,
-        dilation=1,
-        padding=0,
-        bias=False,
-        groups=1,
-        heads=-1,
-        separable=False,
-        normalization="batch",
-        norm_groups=1,
-        quantize=False,
-    ):
+        in_channels: int,
+        out_channels: int,
+        kernel_size: int = 11,
+        stride: int = 1,
+        dilation: int = 1,
+        padding: int = 0,
+        bias: bool = False,
+        groups: int = 1,
+        heads: int = -1,
+        separable: bool = False,
+        normalization: str = "batch",
+        norm_groups: int = 1,
+        quantize: bool = False,
+    ) -> list[nn.Module]:
         """Get the Conv layer."""
         if norm_groups == -1:
             norm_groups = out_channels
@@ -1017,42 +947,36 @@ class JasperBlock(nn.Module):
                     bias=bias,
                     groups=groups,
                     quantize=quantize,
-                )
+                ),
             ]
 
         if normalization == "group":
-            layers.append(
-                nn.GroupNorm(num_groups=norm_groups, num_channels=out_channels)
-            )
+            layers.append(nn.GroupNorm(num_groups=norm_groups, num_channels=out_channels))
         elif normalization == "instance":
-            layers.append(
-                nn.GroupNorm(num_groups=out_channels, num_channels=out_channels)
-            )
+            layers.append(nn.GroupNorm(num_groups=out_channels, num_channels=out_channels))
         elif normalization == "layer":
             layers.append(nn.GroupNorm(num_groups=1, num_channels=out_channels))
         elif normalization == "batch":
             layers.append(nn.BatchNorm1d(out_channels, eps=1e-3, momentum=0.1))
         else:
-            raise ValueError(
-                f"Normalization method ({normalization}) does not match"
-                " one of [batch, layer, group, instance]."
+            raise ValueError(  # noqa: TRY003
+                f"Normalization method ({normalization}) does not match one of [batch, layer, group, instance].",  # noqa: EM102
             )
 
         if groups > 1:
             layers.append(GroupShuffle(groups, out_channels))
         return layers
 
-    def _get_act_dropout_layer(self, drop_prob=0.2, activation=None):
+    def _get_act_dropout_layer(self, drop_prob: float = 0.2, activation: nn.Module | None = None) -> list[nn.Module]:
         """Define activation and dropout layers."""
         if activation is None:
             activation = nn.Hardtanh(min_val=0.0, max_val=20.0)
-        layers = [activation, nn.Dropout(p=drop_prob)]
+        return [activation, nn.Dropout(p=drop_prob)]
 
-        return layers
-
-    def forward(  # noqa: C901
-        self, input_tuple: Tuple[List[Tensor], Optional[Tensor]]
-    ) -> Tuple[List[Tensor], Optional[Tensor]]:
+    def forward(  # noqa: PLR0912
+        self,
+        input_tuple: tuple[list[torch.Tensor], torch.Tensor | None],
+    ) -> tuple[list[torch.Tensor], torch.Tensor | None]:
         """
         Forward pass of the module.
 
@@ -1068,7 +992,7 @@ class JasperBlock(nn.Module):
         """
         lens_orig = None
         xs = input_tuple[0]
-        if len(input_tuple) == 2:
+        if len(input_tuple) == 2:  # noqa: PLR2004
             xs, lens_orig = input_tuple
 
         # compute forward convolutions
@@ -1094,16 +1018,13 @@ class JasperBlock(nn.Module):
                     else:
                         res_out = res_layer(res_out)
 
-                if self.residual_mode == "add" or self.residual_mode == "stride_add":
-                    if PYTORCH_QUANTIZATION_AVAILABLE and self.quantize:
-                        out = self.residual_quantizer(out) + res_out
-                    elif not PYTORCH_QUANTIZATION_AVAILABLE and self.quantize:
-                        raise ImportError(
-                            "pytorch-quantization is not installed. Install from "
-                            "https://github.com/NVIDIA/TensorRT/tree/master/tools/pytorch-quantization."
+                if self.residual_mode in ["add", "stride_add"]:
+                    if not PYTORCH_QUANTIZATION_AVAILABLE and self.quantize:
+                        raise ImportError(  # noqa: TRY003
+                            "pytorch-quantization is not installed. Install from "  # noqa: EM101
+                            "https://github.com/NVIDIA/TensorRT/tree/master/tools/pytorch-quantization.",
                         )
-                    else:
-                        out = out + res_out
+                    out = out + res_out
                 else:
                     out = torch.max(out, res_out)
 
@@ -1111,7 +1032,7 @@ class JasperBlock(nn.Module):
         out = self.mout(out)
 
         if self.res is not None and self.dense_residual:
-            return xs + [out], lens
+            return [*xs, out], lens
 
         return [out], lens
 
@@ -1136,7 +1057,7 @@ class AttentivePoolLayer(nn.Module):
         kernel_size: int = 1,
         dilation: int = 1,
         eps: float = 1e-10,
-    ):
+    ) -> None:
         """Initialize Attentive Pooling Layer."""
         super().__init__()
 
@@ -1159,7 +1080,7 @@ class AttentivePoolLayer(nn.Module):
         )
         self.eps = eps
 
-    def forward(self, x, length=None):
+    def forward(self, x: torch.Tensor, length: torch.Tensor | None = None) -> torch.Tensor:
         """Forward pass of Attentive Pooling Layer."""
         max_len = x.size(2)
 
@@ -1177,7 +1098,7 @@ class AttentivePoolLayer(nn.Module):
         # attention statistics
         attn = self.attention_layer(attn)  # attention pass
         attn = attn.masked_fill(mask == 0, -inf)
-        alpha = F.softmax(attn, dim=2)  # attention values, α
+        alpha = F.softmax(attn, dim=2)  # attention values, a
         mu, sg = get_statistics_with_mask(x, alpha)  # µ and ∑
 
         # gather
@@ -1203,15 +1124,15 @@ class TDNNModule(nn.Module):
         tdnn layer output
     """
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         inp_filters: int,
         out_filters: int,
         kernel_size: int = 1,
         dilation: int = 1,
         stride: int = 1,
-        padding: int = None,
-    ):
+        padding: int | None = None,
+    ) -> None:
         """Initialize the module."""
         super().__init__()
         if padding is None:
@@ -1228,7 +1149,7 @@ class TDNNModule(nn.Module):
         self.activation = nn.ReLU()
         self.bn = nn.BatchNorm1d(out_filters)
 
-    def forward(self, x, length=None):
+    def forward(self, x: torch.Tensor, _length: torch.Tensor | None = None) -> torch.Tensor:
         """Forward pass of TDNNModule."""
         x = self.conv_layer(x)
         x = self.activation(x)
@@ -1263,14 +1184,12 @@ class StatsPoolLayer(nn.Module):
         pool_mode: str = "xvector",
         eps: float = 1e-10,
         biased: bool = True,
-    ):
+    ) -> None:
         """Initialize the module."""
         super().__init__()
         supported_modes = {"xvector", "tap"}
         if pool_mode not in supported_modes:
-            raise ValueError(
-                f"Pool mode must be one of {supported_modes}; got {pool_mode}"
-            )
+            raise ValueError(f"Pool mode must be one of {supported_modes}; got {pool_mode}")  # noqa: TRY003 EM102
         self.pool_mode = pool_mode
         self.feat_in = feat_in
         self.eps = eps
@@ -1279,7 +1198,7 @@ class StatsPoolLayer(nn.Module):
             # Mean + std
             self.feat_in *= 2
 
-    def forward(self, encoder_output, length=None):
+    def forward(self, encoder_output: torch.Tensor, length: torch.Tensor | None = None) -> torch.Tensor:
         """Forward pass of StatsPoolLayer."""
         if length is None:
             mean = encoder_output.mean(dim=-1)  # Time Axis
@@ -1289,9 +1208,7 @@ class StatsPoolLayer(nn.Module):
             else:
                 pooled = mean
         else:
-            mask = make_seq_mask_like(
-                like=encoder_output, lengths=length, valid_ones=False
-            )
+            mask = make_seq_mask_like(like=encoder_output, lengths=length, valid_ones=False)
             encoder_output = encoder_output.masked_fill(mask, 0.0)
             # [B, D, T] -> [B, D]
             means = encoder_output.mean(dim=-1)

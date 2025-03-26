@@ -20,11 +20,10 @@
 """Segmentation module for the diarization service."""
 
 import math
-from typing import Dict, List, Tuple
 
 import torch
 from torch.cuda.amp import autocast
-from torch.utils.data import Dataset
+from torch.utils.data import DataLoader, Dataset
 
 from wordcab_transcribe.services.diarization.models import (
     EncDecSpeakerLabelModel,
@@ -36,9 +35,7 @@ from wordcab_transcribe.services.diarization.utils import segmentation_collate_f
 class AudioSegmentDataset(Dataset):
     """Dataset for audio segments used by the SegmentationModule."""
 
-    def __init__(
-        self, waveform: torch.Tensor, segments: List[dict], sample_rate=16000
-    ) -> None:
+    def __init__(self, waveform: torch.Tensor, segments: list[dict], sample_rate: int = 16000) -> None:
         """
         Initialize the dataset for the SegmentationModule.
 
@@ -55,7 +52,7 @@ class AudioSegmentDataset(Dataset):
         """Get the length of the dataset."""
         return len(self.segments)
 
-    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor]:
+    def __getitem__(self, idx: int) -> tuple[torch.Tensor, torch.Tensor]:
         """
         Get an item from the dataset.
 
@@ -90,9 +87,9 @@ class SegmentationModule:
         self,
         waveform: torch.Tensor,
         batch_size: int,
-        vad_outputs: List[dict],
-        scale_dict: Dict[int, Tuple[float, float]],
-        multiscale_weights: List[float],
+        vad_outputs: list[dict],
+        scale_dict: dict[int, tuple[float, float]],
+        multiscale_weights: list[float],
     ) -> MultiscaleEmbeddingsAndTimestamps:
         """
         Run the segmentation module.
@@ -112,19 +109,13 @@ class SegmentationModule:
         """
         embeddings, timestamps = [], []
 
-        for _, (window, shift) in scale_dict.items():
-            scale_segments = self.get_audio_segments_from_scale(
-                vad_outputs, window, shift
-            )
+        for window, shift in scale_dict.values():
+            scale_segments = self.get_audio_segments_from_scale(vad_outputs, window, shift)
 
-            _embeddings, _timestamps = self.extract_embeddings(
-                waveform, scale_segments, batch_size
-            )
+            _embeddings, _timestamps = self.extract_embeddings(waveform, scale_segments, batch_size)
 
             if len(_embeddings) != len(_timestamps):
-                raise ValueError(
-                    "Mismatch of counts between embedding vectors and timestamps"
-                )
+                raise ValueError("Mismatch of counts between embedding vectors and timestamps")  # noqa: TRY003 EM101
 
             embeddings.append(_embeddings)
             timestamps.append(torch.tensor(_timestamps))
@@ -138,11 +129,11 @@ class SegmentationModule:
 
     def get_audio_segments_from_scale(
         self,
-        vad_outputs: List[dict],
+        vad_outputs: list[dict],
         window: float,
         shift: float,
         min_subsegment_duration: float = 0.05,
-    ) -> List[dict]:
+    ) -> list[dict]:
         """
         Return a list of audio segments based on the VAD outputs and the scale window and shift length.
 
@@ -161,9 +152,7 @@ class SegmentationModule:
                 segment["start"] / 16000,
                 segment["end"] / 16000,
             )
-            subsegments = self.get_subsegments(
-                segment_start, segment_end, window, shift
-            )
+            subsegments = self.get_subsegments(segment_start, segment_end, window, shift)
 
             for subsegment in subsegments:
                 start, duration = subsegment
@@ -175,9 +164,9 @@ class SegmentationModule:
     def extract_embeddings(
         self,
         waveform: torch.Tensor,
-        scale_segments: List[dict],
+        scale_segments: list[dict],
         batch_size: int,
-    ) -> Tuple[torch.Tensor, List[List[float]]]:
+    ) -> tuple[torch.Tensor, list[list[float]]]:
         """
         This method extracts speaker embeddings from the audio file based on the scale segments.
 
@@ -192,7 +181,7 @@ class SegmentationModule:
         all_embs = torch.empty([0])
 
         dataset = AudioSegmentDataset(waveform, scale_segments)
-        dataloader = torch.utils.data.DataLoader(
+        dataloader = DataLoader(
             dataset,
             batch_size=batch_size,
             shuffle=False,
@@ -205,7 +194,8 @@ class SegmentationModule:
 
             with torch.no_grad(), autocast():
                 _, embeddings = self.speaker_model.forward(
-                    input_signal=audio_signal, input_signal_length=audio_signal_len
+                    input_signal=audio_signal,
+                    input_signal_length=audio_signal_len,
                 )
                 embeddings = embeddings.view(-1, embeddings.shape[-1])
                 all_embs = torch.cat((all_embs, embeddings.cpu().detach()), dim=0)
@@ -214,19 +204,14 @@ class SegmentationModule:
 
         embeddings, time_stamps = [], []
         for i, segment in enumerate(scale_segments):
-            if i == 0:
-                embeddings = all_embs[i].view(1, -1)
-            else:
-                embeddings = torch.cat((embeddings, all_embs[i].view(1, -1)))
+            embeddings = all_embs[i].view(1, -1) if i == 0 else torch.cat((embeddings, all_embs[i].view(1, -1)))
 
             time_stamps.append([segment["offset"], segment["duration"]])
 
         return embeddings, time_stamps
 
     @staticmethod
-    def get_subsegments(
-        segment_start: float, segment_end: float, window: float, shift: float
-    ) -> List[List[float]]:
+    def get_subsegments(segment_start: float, segment_end: float, window: float, shift: float) -> list[list[float]]:
         """
         Return a list of subsegments based on the segment start and end time and the window and shift length.
 
@@ -243,13 +228,11 @@ class SegmentationModule:
         duration = segment_end - segment_start
         base = math.ceil((duration - window) / shift)
 
-        subsegments: List[List[float]] = []
+        subsegments: list[list[float]] = []
         slices = 1 if base < 0 else base + 1
         for slice_id in range(slices):
             end = start + window
-
-            if end > segment_end:
-                end = segment_end
+            end = min(end, segment_end)
 
             subsegments.append([start, end - start])
 

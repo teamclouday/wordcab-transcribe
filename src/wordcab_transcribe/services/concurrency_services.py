@@ -20,13 +20,12 @@
 """GPU service class to handle gpu availability for models."""
 
 import asyncio
-from typing import List
 
 
 class GPUService:
     """GPU service class to handle gpu availability for models."""
 
-    def __init__(self, device: str, device_index: List[int]) -> None:
+    def __init__(self, device: str, device_index: list[int]) -> None:
         """
         Initialize the GPU service.
 
@@ -35,7 +34,8 @@ class GPUService:
             device_index (List[int]): Index of the device to use for inference.
         """
         self.device: str = device
-        self.device_index: List[int] = device_index
+        self.device_index: list[int] = device_index
+        self.available_devices = set(self.device_index)
 
         self.queue = asyncio.Queue(maxsize=len(self.device_index))
         for idx in self.device_index:
@@ -51,9 +51,11 @@ class GPUService:
         while True:
             try:
                 device_index = self.queue.get_nowait()
-                return device_index
+                self.available_devices.remove(device_index)
             except asyncio.QueueEmpty:
                 await asyncio.sleep(1.0)
+            else:
+                return device_index
 
     def release_device(self, device_index: int) -> None:
         """
@@ -62,21 +64,22 @@ class GPUService:
         Args:
             device_index (int): Index of the device to add to the available devices list.
         """
-        if not any(item == device_index for item in self.queue._queue):
+        if device_index not in self.available_devices:
+            self.available_devices.add(device_index)
             self.queue.put_nowait(device_index)
 
 
 class URLService:
     """URL service class to handle multiple remote URLs."""
 
-    def __init__(self, remote_urls: List[str]) -> None:
+    def __init__(self, remote_urls: list[str]) -> None:
         """
         Initialize the URL service.
 
         Args:
             remote_urls (List[str]): List of remote URLs to use.
         """
-        self.remote_urls: List[str] = remote_urls
+        self.remote_urls: list[str] = remote_urls
         self._init_queue()
 
     def _init_queue(self) -> None:
@@ -94,7 +97,7 @@ class URLService:
         """
         return self.queue.qsize()
 
-    def get_urls(self) -> List[str]:
+    def get_urls(self) -> list[str]:
         """
         Get the list of available URLs.
 

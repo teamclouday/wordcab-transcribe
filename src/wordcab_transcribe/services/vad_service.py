@@ -19,8 +19,6 @@
 # and limitations under the License.
 """Voice Activation Detection (VAD) Service for audio files."""
 
-from typing import List, Optional, Tuple, Union
-
 import torch
 import torchaudio
 from faster_whisper.vad import VadOptions, get_speech_timestamps
@@ -42,8 +40,10 @@ class VadService:
         )
 
     def __call__(
-        self, waveform: torch.Tensor, group_timestamps: Optional[bool] = True
-    ) -> Tuple[Union[List[dict], List[List[dict]]], torch.Tensor]:
+        self,
+        waveform: torch.Tensor,
+        group_timestamps: bool | None = True,
+    ) -> tuple[list[dict] | list[list[dict]], torch.Tensor]:
         """
         Use the VAD model to get the speech timestamps. Multi-channel pipeline.
 
@@ -57,13 +57,9 @@ class VadService:
         if waveform.size(0) == 1:
             waveform = waveform.squeeze(0)
 
-        speech_timestamps = get_speech_timestamps(
-            audio=waveform, vad_options=self.options
-        )
+        speech_timestamps = get_speech_timestamps(audio=waveform, vad_options=self.options)
 
-        _speech_timestamps_list = [
-            {"start": ts["start"], "end": ts["end"]} for ts in speech_timestamps
-        ]
+        _speech_timestamps_list = [{"start": ts["start"], "end": ts["end"]} for ts in speech_timestamps]
 
         if group_timestamps:
             speech_timestamps_list = self.group_timestamps(_speech_timestamps_list)
@@ -72,9 +68,7 @@ class VadService:
 
         return speech_timestamps_list, waveform
 
-    def group_timestamps(
-        self, timestamps: List[dict], threshold: Optional[float] = 3.0
-    ) -> List[List[dict]]:
+    def group_timestamps(self, timestamps: list[dict], threshold: float | None = 3.0) -> list[list[dict]]:
         """
         Group timestamps based on a threshold.
 
@@ -88,10 +82,7 @@ class VadService:
         grouped_segments = [[]]
 
         for i in range(len(timestamps)):
-            if (
-                i > 0
-                and (timestamps[i]["start"] - timestamps[i - 1]["end"]) > threshold
-            ):
+            if i > 0 and (timestamps[i]["start"] - timestamps[i - 1]["end"]) > threshold:
                 grouped_segments.append([])
 
             grouped_segments[-1].append(timestamps[i])
@@ -106,6 +97,4 @@ class VadService:
             filepath (str): Path to save the audio file.
             audio (torch.Tensor): Audio tensor.
         """
-        torchaudio.save(
-            filepath, audio.unsqueeze(0), self.sample_rate, bits_per_sample=16
-        )
+        torchaudio.save(filepath, audio.unsqueeze(0), self.sample_rate, bits_per_sample=16)

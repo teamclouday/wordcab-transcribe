@@ -18,18 +18,16 @@
 # See the License for the specific language governing permissions
 # and limitations under the License.
 """Diarization Service for audio files."""
-import os
-from typing import List, NamedTuple, Optional, Tuple, Union
 
+import os
+from typing import TYPE_CHECKING, NamedTuple
+
+import numpy as np
 import torch
 from loguru import logger
-from tensorshare import Backend, TensorShare
 
 from wordcab_transcribe.models import DiarizationOutput
 from wordcab_transcribe.services.diarization.clustering_module import ClusteringModule
-from wordcab_transcribe.services.diarization.models import (
-    MultiscaleEmbeddingsAndTimestamps,
-)
 from wordcab_transcribe.services.diarization.segmentation_module import (
     SegmentationModule,
 )
@@ -40,6 +38,11 @@ from wordcab_transcribe.utils import (
     process_audio_file_sync,
     read_audio,
 )
+
+if TYPE_CHECKING:
+    from wordcab_transcribe.services.diarization.models import (
+        MultiscaleEmbeddingsAndTimestamps,
+    )
 
 
 class DiarizationModels(NamedTuple):
@@ -53,13 +56,13 @@ class DiarizationModels(NamedTuple):
 class DiarizeService:
     """Diarize Service for audio files."""
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         device: str,
-        device_index: List[int],
-        window_lengths: List[float],
-        shift_lengths: List[float],
-        multiscale_weights: List[int],
+        device_index: list[int],
+        window_lengths: list[float],
+        shift_lengths: list[float],
+        multiscale_weights: list[int],
         max_num_speakers: int = 8,
     ) -> None:
         """Initialize the Diarize Service.
@@ -85,15 +88,14 @@ class DiarizeService:
         self.seg_batch_size = os.getenv("DIARIZATION_SEGMENTATION_BATCH_SIZE", None)
         if self.seg_batch_size is not None:
             self.default_segmentation_batch_size = int(self.seg_batch_size)
+        elif len(self.default_multiscale_weights) > 3:  # noqa: PLR2004
+            self.default_segmentation_batch_size = 64
+        elif len(self.default_multiscale_weights) > 1:
+            self.default_segmentation_batch_size = 128
         else:
-            if len(self.default_multiscale_weights) > 3:
-                self.default_segmentation_batch_size = 64
-            elif len(self.default_multiscale_weights) > 1:
-                self.default_segmentation_batch_size = 128
-            else:
-                self.default_segmentation_batch_size = 256
+            self.default_segmentation_batch_size = 256
         logger.info(f"segmentation_batch_size set to {self.seg_batch_size}")
-        self.default_scale_dict = dict(enumerate(zip(window_lengths, shift_lengths)))
+        self.default_scale_dict = dict(enumerate(zip(window_lengths, shift_lengths, strict=True)))
 
         for idx in device_index:
             _device = f"cuda:{idx}" if self.device == "cuda" else "cpu"
@@ -107,15 +109,15 @@ class DiarizeService:
                 device=_device,
             )
 
-    def __call__(
+    def __call__(  # noqa: PLR0913
         self,
         audio_duration: float,
         oracle_num_speakers: int,
         model_index: int,
         vad_service: VadService,
-        waveform: Optional[Union[torch.Tensor, TensorShare]] = None,
-        url: Optional[str] = None,
-        url_type: Optional[str] = None,
+        waveform: torch.Tensor | np.ndarray | None = None,
+        url: str | None = None,
+        url_type: str | None = None,
     ) -> DiarizationOutput:
         """
         Run inference with the diarization model.
@@ -144,9 +146,8 @@ class DiarizeService:
             filepath = process_audio_file_sync(filepath)
             waveform, _ = read_audio(filepath)
             delete_file(filepath)
-        elif isinstance(waveform, TensorShare):
-            ts = waveform.to_tensors(backend=Backend.TORCH)
-            waveform = ts["audio"]
+        elif isinstance(waveform, np.ndarray):
+            waveform = torch.from_numpy(waveform)
         elif isinstance(waveform, torch.Tensor):
             pass
         else:
@@ -157,35 +158,20 @@ class DiarizeService:
         if len(vad_outputs) == 0:  # Empty audio
             return None
 
-        if audio_duration < 3600:
+        if audio_duration < 3600:  # noqa: PLR2004
             scale_dict = self.default_scale_dict
             segmentation_batch_size = self.default_segmentation_batch_size
             multiscale_weights = self.default_multiscale_weights
-        elif audio_duration < 10800:
-            scale_dict = dict(
-                enumerate(
-                    zip(
-                        [3.0, 2.5, 2.0, 1.5, 1.0],
-                        self.default_shift_lengths,
-                    )
-                )
-            )
-            if self.seg_batch_size:
-                segmentation_batch_size = int(self.seg_batch_size)
-            else:
-                segmentation_batch_size = 64
+        elif audio_duration < 10800:  # noqa: PLR2004
+            scale_dict = dict(enumerate(zip([3.0, 2.5, 2.0, 1.5, 1.0], self.default_shift_lengths, strict=False)))
+            segmentation_batch_size = int(self.seg_batch_size) if self.seg_batch_size else 64
             multiscale_weights = self.default_multiscale_weights
         else:
-            scale_dict = dict(enumerate(zip([3.0, 2.0, 1.0], [0.75, 0.5, 0.25])))
-            if self.seg_batch_size:
-                segmentation_batch_size = int(self.seg_batch_size)
-            else:
-                segmentation_batch_size = 32
+            scale_dict = dict(enumerate(zip([3.0, 2.0, 1.0], [0.75, 0.5, 0.25], strict=True)))
+            segmentation_batch_size = int(self.seg_batch_size) if self.seg_batch_size else 32
             multiscale_weights = [1.0, 1.0, 1.0]
 
-        ms_emb_ts: MultiscaleEmbeddingsAndTimestamps = self.models[
-            model_index
-        ].segmentation(
+        ms_emb_ts: MultiscaleEmbeddingsAndTimestamps = self.models[model_index].segmentation(
             waveform=waveform,
             batch_size=segmentation_batch_size,
             vad_outputs=vad_outputs,
@@ -193,9 +179,7 @@ class DiarizeService:
             multiscale_weights=multiscale_weights,
         )
 
-        clustering_outputs = self.models[model_index].clustering(
-            ms_emb_ts, oracle_num_speakers
-        )
+        clustering_outputs = self.models[model_index].clustering(ms_emb_ts, oracle_num_speakers)
 
         _outputs = self.get_contiguous_stamps(clustering_outputs)
         outputs = self.merge_stamps(_outputs)
@@ -203,9 +187,7 @@ class DiarizeService:
         return DiarizationOutput(segments=outputs)
 
     @staticmethod
-    def get_contiguous_stamps(
-        stamps: List[Tuple[float, float, int]]
-    ) -> List[Tuple[float, float, int]]:
+    def get_contiguous_stamps(stamps: list[tuple[float, float, int]]) -> list[tuple[float, float, int]]:
         """
         Return contiguous timestamps.
 
@@ -233,9 +215,7 @@ class DiarizeService:
         return contiguous_stamps
 
     @staticmethod
-    def merge_stamps(
-        stamps: List[Tuple[float, float, int]]
-    ) -> List[Tuple[float, float, int]]:
+    def merge_stamps(stamps: list[tuple[float, float, int]]) -> list[tuple[float, float, int]]:
         """
         Merge timestamps of the same speaker.
 

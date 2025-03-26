@@ -19,8 +19,6 @@
 # and limitations under the License.
 """Diarize endpoint for the Remote Wordcab Transcribe API."""
 
-from typing import Union
-
 from fastapi import APIRouter, HTTPException
 from fastapi import status as http_status
 from loguru import logger
@@ -34,7 +32,7 @@ router = APIRouter()
 
 @router.post(
     "",
-    response_model=Union[DiarizationOutput, str],
+    response_model=DiarizationOutput | str,
     status_code=http_status.HTTP_200_OK,
 )
 async def remote_diarization(

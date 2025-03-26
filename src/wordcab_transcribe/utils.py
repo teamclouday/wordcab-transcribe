@@ -49,7 +49,7 @@ from wordcab_transcribe.models import (
 
 
 # pragma: no cover
-async def async_run_subprocess(command: List[str]) -> tuple:
+async def async_run_subprocess(command: list[str]) -> tuple:
     """
     Run a subprocess asynchronously.
 
@@ -66,7 +66,7 @@ async def async_run_subprocess(command: List[str]) -> tuple:
 
 
 # pragma: no cover
-def run_subprocess(command: List[str]) -> tuple:
+def run_subprocess(command: list[str]) -> tuple:
     """
     Run a subprocess synchronously.
 
@@ -76,9 +76,7 @@ def run_subprocess(command: List[str]) -> tuple:
     Returns:
         tuple: Tuple with the return code, stdout and stderr.
     """
-    process = subprocess.Popen(  # noqa: S603,S607
-        command, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-    )
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)  # noqa: S603
     stdout, stderr = process.communicate()
 
     return process.returncode, stdout, stderr
@@ -90,23 +88,21 @@ def check_ffmpeg() -> bool:
         result = run_subprocess(["ffmpeg", "-version"])
 
         if result[0] != 0:
-            raise subprocess.CalledProcessError(result[0], "ffmpeg")
+            raise subprocess.CalledProcessError(result[0], "ffmpeg")  # noqa: TRY301
 
-        return True
-    except (
-        subprocess.CalledProcessError,
-        FileNotFoundError,  # noqa: S404
-    ):
+    except (subprocess.CalledProcessError, FileNotFoundError):
         return False
+    else:
+        return True
 
 
-async def check_num_channels(filepath: Union[str, Path]) -> int:
+async def check_num_channels(filepath: str | Path) -> int:
     """Check the number of channels in an audio file."""
     if isinstance(filepath, str):
         _filepath = Path(filepath)
 
     if not _filepath.exists():
-        raise FileNotFoundError(f"File {filepath} does not exist.")
+        raise FileNotFoundError(f"File {filepath} does not exist.")  # noqa: TRY003 EM102
 
     cmd = [
         "ffprobe",
@@ -118,15 +114,17 @@ async def check_num_channels(filepath: Union[str, Path]) -> int:
     returncode, stdout, stderr = await async_run_subprocess(cmd)
 
     if returncode != 0:
-        raise Exception(f"Error converting file {filepath} to wav format: {stderr}")
+        raise Exception(f"Error converting file {filepath} to wav format: {stderr}")  # noqa: TRY002 TRY003 EM102
 
     output = stdout.decode("utf-8")
     for line in output.split("\n"):
         if line.startswith("channels"):
             return int(line.split("=")[1])
 
+    return 1  # default to 1 channel
 
-def convert_timestamp(timestamp: float, target: Timestamps, round_digits: Optional[int] = 3) -> Union[str, float]:
+
+def convert_timestamp(timestamp: float, target: Timestamps, round_digits: int | None = 3) -> str | float:
     """
     Use the right function to convert the timestamp.
 
@@ -148,7 +146,7 @@ def convert_timestamp(timestamp: float, target: Timestamps, round_digits: Option
     elif target == Timestamps.seconds:
         return round(timestamp, round_digits)
     else:
-        raise ValueError(f"Invalid conversion target: {target}. Valid targets are: ms, hms, s.")
+        raise ValueError(f"Invalid conversion target: {target}. Valid targets are: ms, hms, s.")  # noqa: TRY003 EM102
 
 
 def _convert_s_to_ms(timestamp: float) -> float:
@@ -178,9 +176,7 @@ def _convert_s_to_hms(timestamp: float) -> str:
     minutes, seconds = divmod(remainder, 60)
     ms = (seconds - int(seconds)) * 1000
 
-    output = f"{int(hours):02}:{int(minutes):02}:{int(seconds):02}.{int(ms):03}"
-
-    return output
+    return f"{int(hours):02}:{int(minutes):02}:{int(seconds):02}.{int(ms):03}"
 
 
 # pragma: no cover
@@ -188,8 +184,8 @@ async def download_audio_file(
     source: str,
     url: str,
     filename: str,
-    url_headers: Optional[Dict[str, str]] = None,
-) -> Union[str, Awaitable[str]]:
+    url_headers: dict[str, str] | None = None,
+) -> str | Awaitable[str]:
     """
     Download an audio file from a URL.
 
@@ -208,7 +204,7 @@ async def download_audio_file(
     if source == "url":
         filename = await _download_file_from_url(url, filename, url_headers)
     else:
-        raise ValueError(f"Invalid source: {source}. Valid sources is url.")
+        raise ValueError(f"Invalid source: {source}. Valid sources is url.")  # noqa: TRY003 EM102
 
     return filename
 
@@ -236,7 +232,7 @@ def download_audio_file_sync(
     if source == "url":
         filename = _download_file_from_url_sync(url, filename)
     else:
-        raise ValueError(f"Invalid source: {source}. Valid sources is url.")
+        raise ValueError(f"Invalid source: {source}. Valid sources is url.")  # noqa: TRY003 EM102
 
     return filename
 
@@ -245,7 +241,7 @@ def download_audio_file_sync(
 async def _download_file_from_url(
     url: str,
     filename: str,
-    url_headers: Optional[Dict[str, str]] = None,
+    url_headers: dict[str, str] | None = None,
 ) -> str:
     """
     Download a file from a URL using aiohttp.
@@ -264,24 +260,23 @@ async def _download_file_from_url(
     url_headers = url_headers or {}
 
     logger.info(f"Downloading audio file from {url} to {filename}...")
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url, headers=url_headers) as response:
-            if response.status == 200:
-                async with aiofiles.open(filename, "wb") as f:
-                    while True:
-                        chunk = await response.content.read(1024)
+    async with aiohttp.ClientSession() as session, session.get(url, headers=url_headers) as response:
+        if response.ok:
+            async with aiofiles.open(filename, "wb") as f:
+                while True:
+                    chunk = await response.content.read(1024)
 
-                        if not chunk:
-                            break
+                    if not chunk:
+                        break
 
-                        await f.write(chunk)
-            else:
-                raise Exception(f"Failed to download file. Status: {response.status}")
+                    await f.write(chunk)
+        else:
+            raise Exception(f"Failed to download file. Status: {response.status}")  # noqa: TRY002 TRY003 EM102
 
     return filename
 
 
-def _download_file_from_url_sync(url: str, filename: str, url_headers: Optional[Dict[str, str]] = None) -> str:
+def _download_file_from_url_sync(url: str, filename: str, url_headers: dict[str, str] | None = None) -> str:
     """
     Download a file from a URL using requests.
 
@@ -300,21 +295,21 @@ def _download_file_from_url_sync(url: str, filename: str, url_headers: Optional[
 
     logger.info(f"Downloading audio file from {url} to {filename}...")
 
-    response = requests.get(url, headers=url_headers, stream=True)
+    response = requests.get(url, headers=url_headers, stream=True, timeout=10)
 
-    if response.status_code == 200:
-        with open(filename, "wb") as f:
+    if response.ok:
+        with Path.open(filename, "wb") as f:
             for chunk in response.iter_content(chunk_size=1024):
                 if chunk:  # filter out keep-alive new chunks
                     f.write(chunk)
     else:
-        raise Exception(f"Failed to download file. Status: {response.status_code}")
+        raise Exception(f"Failed to download file. Status: {response.status_code}")  # noqa: TRY002 TRY003 EM102
 
     return filename
 
 
 # pragma: no cover
-def download_model(compute_type: str, language: str) -> Optional[str]:
+def download_model(compute_type: str, language: str) -> str | None:
     """
     Download the special models during the warmup phase.
 
@@ -336,12 +331,10 @@ def download_model(compute_type: str, language: str) -> Optional[str]:
         return None
 
     allow_patterns = ["config.json", "model.bin", "tokenizer.json", "vocabulary.*"]
-    snapshot_path = huggingface_hub.snapshot_download(repo_id, local_files_only=False, allow_patterns=allow_patterns)
-
-    return snapshot_path
+    return huggingface_hub.snapshot_download(repo_id, local_files_only=False, allow_patterns=allow_patterns)
 
 
-def delete_file(filepath: Union[str, Tuple[str, Optional[str]]]) -> None:
+def delete_file(filepath: str | tuple[str, str | None]) -> None:
     """
     Delete a file or a list of files.
 
@@ -356,7 +349,7 @@ def delete_file(filepath: Union[str, Tuple[str, Optional[str]]]) -> None:
             Path(path).unlink(missing_ok=True)
 
 
-def early_return(duration: float) -> Tuple[List[dict], dict, float]:
+def early_return(duration: float) -> tuple[list[dict], dict, float]:
     """
     Early return for empty audio files.
 
@@ -375,7 +368,7 @@ def early_return(duration: float) -> Tuple[List[dict], dict, float]:
                 "end": duration,
                 "speaker": None,
                 "words": None,
-            }
+            },
         ],
         {
             "total": 0,
@@ -387,7 +380,7 @@ def early_return(duration: float) -> Tuple[List[dict], dict, float]:
     )
 
 
-def is_empty_string(text: str):
+def is_empty_string(text: str) -> bool:
     """
     Checks if a string is empty after removing spaces and periods.
 
@@ -399,12 +392,10 @@ def is_empty_string(text: str):
     """
     text = text.replace(".", "")
     text = re.sub(r"\s+", "", text)
-    if text.strip():
-        return False
-    return True
+    return not text.strip()
 
 
-def format_punct(text: str):
+def format_punct(text: str) -> str:
     """
     Removes Whisper's '...' output, and checks for weird spacing in punctuation. Also removes extra spaces.
 
@@ -434,7 +425,7 @@ def format_punct(text: str):
     return text.strip()
 
 
-def format_segments(transcription_output: TranscriptionOutput) -> List[Utterance]:
+def format_segments(transcription_output: TranscriptionOutput) -> list[Utterance]:
     """
     Format the segments to a list of dicts with start, end and text keys. Optionally include word timestamps.
 
@@ -445,7 +436,7 @@ def format_segments(transcription_output: TranscriptionOutput) -> List[Utterance
     Returns:
         List[Utterance]: List of formatted segments.
     """
-    formatted_segments = [
+    return [
         Utterance(
             text=segment.text,
             start=segment.start,
@@ -463,10 +454,8 @@ def format_segments(transcription_output: TranscriptionOutput) -> List[Utterance
         for segment in transcription_output.segments
     ]
 
-    return formatted_segments
 
-
-async def process_audio_file(filepath: str, num_channels: int = 1) -> Union[str, List[str]]:
+async def process_audio_file(filepath: str, num_channels: int = 1) -> str | list[str]:
     """Prepare the audio for inference.
 
     Process an audio file using ffmpeg. The file will be converted to WAV if
@@ -490,7 +479,7 @@ async def process_audio_file(filepath: str, num_channels: int = 1) -> Union[str,
     _filepath = Path(filepath)
 
     if not _filepath.exists():
-        raise FileNotFoundError(f"File {filepath} does not exist.")
+        raise FileNotFoundError(f"File {filepath} does not exist.")  # noqa: TRY003 EM102
 
     # Convert to WAV if num_channels is 1
     if num_channels == 1:
@@ -512,7 +501,7 @@ async def process_audio_file(filepath: str, num_channels: int = 1) -> Union[str,
 
         result = await async_run_subprocess(cmd)
         if result[0] != 0:
-            raise Exception(f"Error converting file {filepath} to wav format: {result[2]}")
+            raise Exception(f"Error converting file {filepath} to wav format: {result[2]}")  # noqa: TRY002 TRY003 EM102
 
         return new_filepath
 
@@ -531,17 +520,17 @@ async def process_audio_file(filepath: str, num_channels: int = 1) -> Union[str,
                     "-ar",
                     "16000",
                     output_files[channel],
-                ]
+                ],
             )
 
         result = await async_run_subprocess(cmd)
         if result[0] != 0:
-            raise Exception(f"Error splitting {num_channels}-channel file: {filepath}. {result[2]}")
+            raise Exception(f"Error splitting {num_channels}-channel file: {filepath}. {result[2]}")  # noqa: TRY002 TRY003 EM102
 
         return output_files
 
 
-def process_audio_file_sync(filepath: str) -> Union[str, List[str]]:
+def process_audio_file_sync(filepath: str) -> str | list[str]:
     """Prepare the audio for inference.
 
     Process an audio file using ffmpeg. The file will be converted to WAV.
@@ -561,7 +550,7 @@ def process_audio_file_sync(filepath: str) -> Union[str, List[str]]:
     _filepath = Path(filepath)
 
     if not _filepath.exists():
-        raise FileNotFoundError(f"File {filepath} does not exist.")
+        raise FileNotFoundError(f"File {filepath} does not exist.")  # noqa: TRY003 EM102
 
     new_filepath = f"{_filepath.stem}_{_filepath.stat().st_mtime_ns}.wav"
     cmd = [
@@ -582,17 +571,17 @@ def process_audio_file_sync(filepath: str) -> Union[str, List[str]]:
     result = run_subprocess(cmd)
 
     if result[0] != 0:
-        raise Exception(f"Error converting file {filepath} to wav format: {result[2]}")
+        raise Exception(f"Error converting file {filepath} to wav format: {result[2]}")  # noqa: TRY002 TRY003 EM102
 
     return new_filepath
 
 
 def read_audio(
-    audio: Union[str, bytes],
-    offset_start: Union[float, None] = None,
-    offset_end: Union[float, None] = None,
+    audio: str | bytes,
+    offset_start: float | None = None,
+    offset_end: float | None = None,
     sample_rate: int = 16000,
-) -> Tuple[torch.Tensor, float]:
+) -> tuple[torch.Tensor, float]:
     """
     Read an audio file and return the audio tensor.
 
@@ -616,7 +605,7 @@ def read_audio(
             wav, sr = sf.read(buffer, format="RAW", channels=1, samplerate=16000, subtype="PCM_16")
         wav = torch.from_numpy(wav).unsqueeze(0)
     else:
-        raise ValueError(f"Invalid audio type. Must be either str or bytes, got: {type(audio)}.")
+        raise TypeError(f"Invalid audio type. Must be either str or bytes, got: {type(audio)}.")  # noqa: TRY003 EM102
 
     if wav.size(0) > 1:
         wav = wav.mean(dim=0, keepdim=True)
@@ -629,15 +618,8 @@ def read_audio(
     audio_duration = float(wav.shape[1]) / sample_rate
 
     # Convert start and end times to sample indices based on the new sample rate
-    if offset_start is not None:
-        start_sample = int(offset_start * sr)
-    else:
-        start_sample = 0
-
-    if offset_end is not None:
-        end_sample = int(offset_end * sr)
-    else:
-        end_sample = wav.shape[1]
+    start_sample = int(offset_start * sr) if offset_start is not None else 0
+    end_sample = int(offset_end * sr) if offset_end is not None else wav.shape[1]
 
     # Trim the audio based on the new start and end samples
     wav = wav[:, start_sample:end_sample]

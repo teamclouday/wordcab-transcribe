@@ -19,13 +19,12 @@
 # and limitations under the License.
 """Add Remote URL endpoint for remote transcription or diarization."""
 
-from typing import List, Union
+from typing import Literal
 
 from fastapi import APIRouter, HTTPException
 from fastapi import status as http_status
 from loguru import logger
 from pydantic import HttpUrl
-from typing_extensions import Literal
 
 from wordcab_transcribe.dependencies import asr
 from wordcab_transcribe.models import UrlSchema
@@ -36,12 +35,12 @@ router = APIRouter()
 
 @router.get(
     "",
-    response_model=Union[List[HttpUrl], str],
+    response_model=list[HttpUrl] | str,
     status_code=http_status.HTTP_200_OK,
 )
-async def get_url(task: Literal["transcription", "diarization"]) -> List[HttpUrl]:
+async def get_url(task: Literal["transcription", "diarization"]) -> list[HttpUrl]:
     """Get Remote URL endpoint for remote transcription or diarization."""
-    result: List[UrlSchema] = await asr.get_url(task)
+    result: list[UrlSchema] = await asr.get_url(task)
 
     if isinstance(result, ProcessException):
         logger.error(result.message)
@@ -50,18 +49,18 @@ async def get_url(task: Literal["transcription", "diarization"]) -> List[HttpUrl
                 status_code=http_status.HTTP_405_METHOD_NOT_ALLOWED,
                 detail=str(result.message),
             )
-        else:
-            raise HTTPException(
-                status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=str(result.message),
-            )
+
+        raise HTTPException(
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(result.message),
+        )
 
     return result
 
 
 @router.post(
     "/add",
-    response_model=Union[UrlSchema, str],
+    response_model=UrlSchema | str,
     status_code=http_status.HTTP_200_OK,
 )
 async def add_url(data: UrlSchema) -> UrlSchema:
@@ -80,7 +79,7 @@ async def add_url(data: UrlSchema) -> UrlSchema:
 
 @router.post(
     "/remove",
-    response_model=Union[UrlSchema, str],
+    response_model=UrlSchema | str,
     status_code=http_status.HTTP_200_OK,
 )
 async def remove_url(data: UrlSchema) -> UrlSchema:

@@ -15,22 +15,23 @@
 """Automate module of the Wordcab Transcribe."""
 
 import json
-from typing import List, Optional
+from pathlib import Path
 
 import requests
+from loguru import logger
 
 from wordcab_transcribe.models import AudioResponse, BaseResponse
 
 
-def run_audio_url(
+def run_audio_url(  # noqa: PLR0913
     url: str,
     source_lang: str = "en",
     timestamps: str = "s",
     word_timestamps: bool = False,
     diarization: bool = False,
     multi_channel: bool = False,
-    server_url: Optional[str] = None,
-    vocab: Optional[List[str]] = None,
+    server_url: str | None = None,
+    vocab: list[str] | None = None,
     timeout: int = 900,
 ) -> AudioResponse:
     """
@@ -84,22 +85,23 @@ def run_audio_url(
     try:
         r_json = response.json()
         url_name = url.split("https://")[-1]
-        with open(f"{url_name}.json", "w", encoding="utf-8") as f:
+        with Path.open(f"{url_name}.json", "w", encoding="utf-8") as f:
             json.dump(r_json, f, indent=4, ensure_ascii=False)
+    except Exception as e:
+        logger.error(f"An exception occurred. ${e}")
+    else:
         return response
-    except Exception:
-        print("An exception occurred")
 
 
-def run_api_audio_file(
+def run_api_audio_file(  # noqa: PLR0913
     file: str,
     source_lang: str = "en",
     timestamps: str = "s",
     word_timestamps: bool = False,
     diarization: bool = False,
     multi_channel: bool = False,
-    server_url: Optional[str] = None,
-    vocab: Optional[List[str]] = None,
+    server_url: str | None = None,
+    vocab: list[str] | None = None,
     timeout: int = 900,
 ) -> AudioResponse:
     """
@@ -129,7 +131,7 @@ def run_api_audio_file(
     if vocab:
         data["vocab"] = vocab
 
-    with open(file, "rb") as f:
+    with Path.open(file, "rb") as f:
         files = {"file": f}
         if server_url is None:
             response = requests.post(
@@ -149,15 +151,16 @@ def run_api_audio_file(
     try:
         r_json = response.json()
         filename = file.split(".")[0]
-        with open(f"{filename}.json", "w", encoding="utf-8") as f:
+        with Path.open(f"{filename}.json", "w", encoding="utf-8") as f:
             json.dump(r_json, f, indent=4, ensure_ascii=False)
+    except Exception as e:
+        logger.error(f"An exception occurred. ${e}")
+    else:
         return response
-    except Exception:
-        print("An exception occurred")
 
 
 # run API function that will delegate to other functions based on the endpoint
-def run_api(
+def run_api(  # noqa: PLR0913
     endpoint: str,
     source: str,
     source_lang: str = "en",
@@ -165,8 +168,8 @@ def run_api(
     word_timestamps: bool = False,
     diarization: bool = False,
     multi_channel: bool = False,
-    server_url: Optional[str] = None,
-    vocab: Optional[List[str]] = None,
+    server_url: str | None = None,
+    vocab: list[str] | None = None,
     timeout: int = 900,
 ) -> BaseResponse:
     """

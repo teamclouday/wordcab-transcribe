@@ -19,8 +19,6 @@
 # and limitations under the License.
 """Live endpoints for the Wordcab Transcribe API."""
 
-from typing import List
-
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from wordcab_transcribe.dependencies import asr
@@ -33,14 +31,12 @@ class ConnectionManager:
 
     def __init__(self) -> None:
         """Initialize the connection manager."""
-        self.active_connections: List[WebSocket] = []
+        self.active_connections: list[WebSocket] = []
 
     async def connect(self, websocket: WebSocket) -> None:
         """Connect a WebSocket."""
         if len(self.active_connections) > 1:
-            await websocket.close(
-                code=1001, reason="Too many connections, try again later."
-            )
+            await websocket.close(code=1001, reason="Too many connections, try again later.")
 
         else:
             await websocket.accept()
