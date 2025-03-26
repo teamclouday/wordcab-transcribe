@@ -24,7 +24,6 @@ import json
 from datetime import datetime
 from typing import List, Optional, Union
 
-import boto3
 import shortuuid
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from fastapi import status as http_status
@@ -44,26 +43,6 @@ from wordcab_transcribe.utils import (
 )
 
 router = APIRouter()
-
-
-def retrieve_service(service, aws_creds):
-    return boto3.client(
-        service,
-        aws_access_key_id=aws_creds.get("aws_access_key_id"),
-        aws_secret_access_key=aws_creds.get("aws_secret_access_key"),
-        region_name=aws_creds.get("region_name"),
-    )
-
-
-if settings.send_results_to_s3:
-    s3_client = retrieve_service(
-        "s3",
-        {
-            "aws_access_key_id": settings.aws_access_key_id,
-            "aws_secret_access_key": settings.aws_secret_access_key,
-            "region_name": settings.aws_region_name,
-        },
-    )
 
 
 @router.post("", status_code=http_status.HTTP_202_ACCEPTED)
@@ -165,14 +144,6 @@ async def inference_with_audio_url(
 
                 if settings.debug:
                     logger.debug(f"Result: {result.model_dump()}")
-                else:
-                    if settings.send_results_to_s3:
-                        upload_file(
-                            s3_client,
-                            file=bytes(json.dumps(result.model_dump()).encode("UTF-8")),
-                            bucket=settings.aws_storage_bucket_name,
-                            object_name=f"responses/{data.task_token}_{data.job_name}.json",
-                        )
 
                 background_tasks.add_task(delete_file, filepath=filepath)
         except Exception as e:

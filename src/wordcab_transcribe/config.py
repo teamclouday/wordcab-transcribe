@@ -66,12 +66,6 @@ class Settings:
     openssl_key: str
     openssl_algorithm: str
     access_token_expire_minutes: int
-    # AWS configuration
-    send_results_to_s3: bool
-    aws_access_key_id: str
-    aws_secret_access_key: str
-    aws_storage_bucket_name: str
-    aws_region_name: str
     # Remote servers configuration
     transcribe_server_urls: Union[List[str], None]
     diarize_server_urls: Union[List[str], None]
@@ -345,12 +339,6 @@ settings = Settings(
     openssl_key=getenv("OPENSSL_KEY", "0123456789abcdefghijklmnopqrstuvwyz"),
     openssl_algorithm=getenv("OPENSSL_ALGORITHM", "HS256"),
     access_token_expire_minutes=getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 30),
-    # AWS configuration
-    send_results_to_s3=getenv("SEND_RESULTS_TO_S3", False),
-    aws_access_key_id=getenv("AWS_ACCESS_KEY_ID", ""),
-    aws_secret_access_key=getenv("AWS_SECRET_ACCESS_KEY", ""),
-    aws_storage_bucket_name=getenv("AWS_STORAGE_BUCKET_NAME", ""),
-    aws_region_name=getenv("AWS_REGION_NAME", ""),
     # Remote servers configuration
     transcribe_server_urls=transcribe_server_urls,
     diarize_server_urls=diarize_server_urls,
