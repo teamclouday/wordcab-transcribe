@@ -18,6 +18,7 @@
 # See the License for the specific language governing permissions
 # and limitations under the License.
 """Utils module of the Wordcab Transcribe."""
+
 import asyncio
 import io
 import re
@@ -696,22 +697,6 @@ def read_audio(
     wav = wav[:, start_sample:end_sample]
 
     return wav.squeeze(0), audio_duration
-
-
-def remove_words_for_svix(dict_payload: dict) -> dict:
-    """
-    Remove the words from the utterances for SVIX.
-
-    Args:
-        dict_payload (dict): The dict payload.
-
-    Returns:
-        dict: The dict payload with the words removed.
-    """
-    for utterance in dict_payload["utterances"]:
-        utterance.pop("words", None)
-
-    return dict_payload
 
 
 def retrieve_user_platform() -> str:

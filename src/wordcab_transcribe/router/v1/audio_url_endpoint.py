@@ -29,7 +29,6 @@ import shortuuid
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from fastapi import status as http_status
 from loguru import logger
-from svix.api import MessageIn, SvixAsync
 
 from wordcab_transcribe.config import settings
 from wordcab_transcribe.dependencies import asr, download_limit
@@ -83,12 +82,12 @@ async def inference_with_audio_url(
                 _filepath = await download_audio_file("url", url, filename)
 
                 num_channels = await check_num_channels(_filepath)
-                if (
-                        num_channels > 1 and data.multi_channel is False
-                ) or (
-                        num_channels == 1 and data.multi_channel is True
+                if (num_channels > 1 and data.multi_channel is False) or (
+                    num_channels == 1 and data.multi_channel is True
                 ):
-                    num_channels = 1  # Force mono channel if more than 1 channel or vice versa
+                    num_channels = (
+                        1  # Force mono channel if more than 1 channel or vice versa
+                    )
                     new_data = data.dict()
                     if data.multi_channel:
                         new_data["diarization"] = True
@@ -175,16 +174,6 @@ async def inference_with_audio_url(
                             object_name=f"responses/{data.task_token}_{data.job_name}.json",
                         )
 
-                    if settings.svix_api_key and settings.svix_app_id:
-                        await send_update_with_svix(
-                            data.job_name,
-                            "finished",
-                            {
-                                "job_name": data.job_name,
-                                "task_token": data.task_token,
-                            },
-                        )
-
                 background_tasks.add_task(delete_file, filepath=filepath)
         except Exception as e:
             try:
@@ -198,14 +187,6 @@ async def inference_with_audio_url(
             except:
                 pass
             logger.error(error_message)
-
-            error_payload = {
-                "error": error_message,
-                "job_name": data.job_name,
-                "task_token": data.task_token,
-            }
-
-            await send_update_with_svix(data.job_name, "error", error_payload)
 
     # Add the process_audio function to background tasks
     background_tasks.add_task(process_audio, data)
@@ -225,36 +206,3 @@ def upload_file(s3_client, file, bucket, object_name):
         logger.error(f"Exception while uploading results to S3: {e}")
         return False
     return True
-
-
-async def send_update_with_svix(
-    job_name: str,
-    status: str,
-    payload: dict,
-    payload_retention_period: Optional[int] = 5,
-) -> None:
-    """
-    Send the status update to Svix.
-
-    Args:
-        job_name (str): The name of the job.
-        status (str): The status of the job.
-        payload (dict): The payload to send.
-        payload_retention_period (Optional[int], optional): The payload retention period. Defaults to 5.
-    """
-    if settings.svix_api_key and settings.svix_app_id:
-        svix = SvixAsync(settings.svix_api_key)
-        await svix.message.create(
-            settings.svix_app_id,
-            MessageIn(
-                event_type=f"async_job.wordcab_transcribe.{status}",
-                event_id=f"wordcab_transcribe_{status}_{job_name}_{datetime.now().strftime('%Y_%m_%d_%H_%M_%S_%f')}",
-                payload_retention_period=payload_retention_period,
-                payload=payload,
-            ),
-        )
-    else:
-        logger.warning(
-            "Svix API key and app ID are not set. Cannot send the status update to"
-            " Svix."
-        )

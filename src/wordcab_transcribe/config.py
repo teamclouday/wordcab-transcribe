@@ -72,9 +72,6 @@ class Settings:
     aws_secret_access_key: str
     aws_storage_bucket_name: str
     aws_region_name: str
-    # Svix configuration
-    svix_api_key: str
-    svix_app_id: str
     # Remote servers configuration
     transcribe_server_urls: Union[List[str], None]
     diarize_server_urls: Union[List[str], None]
@@ -354,9 +351,6 @@ settings = Settings(
     aws_secret_access_key=getenv("AWS_SECRET_ACCESS_KEY", ""),
     aws_storage_bucket_name=getenv("AWS_STORAGE_BUCKET_NAME", ""),
     aws_region_name=getenv("AWS_REGION_NAME", ""),
-    # Svix configuration
-    svix_api_key=getenv("SVIX_API_KEY", ""),
-    svix_app_id=getenv("SVIX_APP_ID", ""),
     # Remote servers configuration
     transcribe_server_urls=transcribe_server_urls,
     diarize_server_urls=diarize_server_urls,
