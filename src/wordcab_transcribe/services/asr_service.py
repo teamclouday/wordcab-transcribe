@@ -19,24 +19,21 @@
 # and limitations under the License.
 """ASR Service module that handle all AI interactions."""
 
-
-import time
-import aiohttp
 import asyncio
+import time
 import traceback
-from dataclasses import dataclass
 from abc import ABC, abstractmethod
-
+from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing_extensions import Literal
-from pydantic import BaseModel, ConfigDict
 from typing import Iterable, List, Optional, Tuple, Union
 
+import aiohttp
 import torch
-from tensorshare import Backend, TensorShare
-
 from loguru import logger
+from pydantic import BaseModel, ConfigDict
+from tensorshare import Backend, TensorShare
+from typing_extensions import Literal
 
 from wordcab_transcribe.config import settings
 from wordcab_transcribe.logging import time_and_tell, time_and_tell_async
@@ -156,9 +153,7 @@ class TranscriptionTask(BaseModel):
 
     execution: Union[LocalExecution, RemoteExecution]
     options: TranscriptionOptions
-    result: Union[
-        ProcessException, TranscriptionOutput, List[TranscriptionOutput], None
-    ] = None
+    result: Union[ProcessException, TranscriptionOutput, List[TranscriptionOutput], None] = None
 
 
 @dataclass
@@ -215,9 +210,7 @@ class ASRService(ABC):
 
         This class is not meant to be instantiated. Use the subclasses instead.
         """
-        self.device = (
-            "cuda" if torch.cuda.is_available() else "cpu"
-        )  # Do we have a GPU? If so, use it!
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"  # Do we have a GPU? If so, use it!
         self.num_gpus = torch.cuda.device_count() if self.device == "cuda" else 0
         logger.info(f"NVIDIA GPUs available: {self.num_gpus}")
 
@@ -226,14 +219,11 @@ class ASRService(ABC):
         else:
             self.device_index = [0]
 
-        self.gpu_handler = GPUService(
-            device=self.device, device_index=self.device_index
-        )
+        self.gpu_handler = GPUService(device=self.device, device_index=self.device_index)
 
     @abstractmethod
     async def process_input(self) -> None:
-        """Process the input request by creating a task and adding it to the appropriate queues.
-        """
+        """Process the input request by creating a task and adding it to the appropriate queues."""
         raise NotImplementedError("This method should be implemented in subclasses.")
 
 
@@ -288,9 +278,7 @@ class ASRAsyncService(ASRService):
         self.shift_lengths: List[float] = shift_lengths
         self.multiscale_weights: List[float] = multiscale_weights
         self.extra_languages: Union[List[str], None] = extra_languages
-        self.extra_languages_model_paths: Union[
-            List[str], None
-        ] = extra_languages_model_paths
+        self.extra_languages_model_paths: Union[List[str], None] = extra_languages_model_paths
 
         self.local_services: LocalServiceRegistry = LocalServiceRegistry()
         self.remote_services: RemoteServiceRegistry = RemoteServiceRegistry()
@@ -304,35 +292,23 @@ class ASRAsyncService(ASRService):
         }
 
         if transcribe_server_urls is not None:
-            logger.info(
-                "You provided URLs for remote transcription server, no local model will"
-                " be used."
-            )
+            logger.info("You provided URLs for remote transcription server, no local model will be used.")
             self.remote_services.transcription = RemoteServiceConfig(
                 use_remote=True,
                 url_handler=URLService(remote_urls=transcribe_server_urls),
             )
         else:
-            logger.info(
-                "You did not provide URLs for remote transcription server, local model"
-                " will be used."
-            )
+            logger.info("You did not provide URLs for remote transcription server, local model will be used.")
             self.create_transcription_local_service()
 
         if diarize_server_urls is not None:
-            logger.info(
-                "You provided URLs for remote diarization server, no local model will"
-                " be used."
-            )
+            logger.info("You provided URLs for remote diarization server, no local model will be used.")
             self.remote_services.diarization = RemoteServiceConfig(
                 use_remote=True,
                 url_handler=URLService(remote_urls=diarize_server_urls),
             )
         else:
-            logger.info(
-                "You did not provide URLs for remote diarization server, local model"
-                " will be used."
-            )
+            logger.info("You did not provide URLs for remote diarization server, local model will be used.")
             self.create_diarization_local_service()
 
         self.debug_mode = debug_mode
@@ -366,9 +342,7 @@ class ASRAsyncService(ASRService):
                 multiscale_weights=self.multiscale_weights,
             )
 
-    def create_local_service(
-        self, task: Literal["transcription", "diarization"]
-    ) -> None:
+    def create_local_service(self, task: Literal["transcription", "diarization"]) -> None:
         """Create a local service."""
         if task == "transcription":
             self.create_transcription_local_service()
@@ -487,9 +461,7 @@ class ASRAsyncService(ASRService):
         if isinstance(filepath, list):
             audio, durations = [], []
             for path in filepath:
-                _audio, _duration = read_audio(
-                    path, offset_start=offset_start, offset_end=offset_end
-                )
+                _audio, _duration = read_audio(path, offset_start=offset_start, offset_end=offset_end)
 
                 audio.append(_audio)
                 durations.append(_duration)
@@ -497,9 +469,7 @@ class ASRAsyncService(ASRService):
             duration = sum(durations) / len(durations)
 
         else:
-            audio, duration = read_audio(
-                filepath, offset_start=offset_start, offset_end=offset_end
-            )
+            audio, duration = read_audio(filepath, offset_start=offset_start, offset_end=offset_end)
 
         gpu_index = None
         if self.remote_services.transcription.use_remote is True:
@@ -525,9 +495,7 @@ class ASRAsyncService(ASRService):
             audio=audio,
             url=url,
             url_type=url_type,
-            diarization=DiarizationTask(
-                execution=diarization_execution, num_speakers=num_speakers
-            ),
+            diarization=DiarizationTask(execution=diarization_execution, num_speakers=num_speakers),
             duration=duration,
             batch_size=batch_size,
             multi_channel=multi_channel,
@@ -563,11 +531,7 @@ class ASRAsyncService(ASRService):
             if isinstance(task.diarization.result, ProcessException):
                 return task.diarization.result
 
-            if (
-                diarization
-                and task.diarization.result is None
-                and multi_channel is False
-            ):
+            if diarization and task.diarization.result is None and multi_channel is False:
                 # Empty audio early return
                 return early_return(duration=duration)
 
@@ -633,14 +597,9 @@ class ASRAsyncService(ASRService):
 
             elif isinstance(task.transcription.execution, RemoteExecution):
                 if isinstance(task.audio, list):
-                    ts = [
-                        TensorShare.from_dict({"audio": a}, backend=Backend.TORCH)
-                        for a in task.audio
-                    ]
+                    ts = [TensorShare.from_dict({"audio": a}, backend=Backend.TORCH) for a in task.audio]
                 else:
-                    ts = TensorShare.from_dict(
-                        {"audio": task.audio}, backend=Backend.TORCH
-                    )
+                    ts = TensorShare.from_dict({"audio": task.audio}, backend=Backend.TORCH)
 
                 data = TranscribeRequest(
                     audio=ts,
@@ -714,9 +673,7 @@ class ASRAsyncService(ASRService):
                     audio = task.url
                     audio_type = task.url_type
                 else:
-                    audio = TensorShare.from_dict(
-                        {"audio": task.audio}, backend=Backend.TORCH
-                    )
+                    audio = TensorShare.from_dict({"audio": task.audio}, backend=Backend.TORCH)
                     audio_type = "tensor"
 
                 data = DiarizationRequest(
@@ -770,9 +727,7 @@ class ASRAsyncService(ASRService):
 
             if task.multi_channel:
                 utterances, process_time = time_and_tell(
-                    self.local_services.post_processing.multi_channel_speaker_mapping(
-                        task.transcription.result
-                    ),
+                    self.local_services.post_processing.multi_channel_speaker_mapping(task.transcription.result),
                     func_name="multi_channel_speaker_mapping",
                     debug_mode=self.debug_mode,
                 )
@@ -839,9 +794,9 @@ class ASRAsyncService(ASRService):
         return None
 
     async def remote_transcription(
-            self,
-            url: str,
-            data: TranscribeRequest,
+        self,
+        url: str,
+        data: TranscribeRequest,
     ) -> TranscriptionOutput:
         """Remote transcription method."""
         headers = {"Content-Type": "application/json"}
@@ -851,9 +806,9 @@ class ASRAsyncService(ASRService):
             auth_url = f"{url}/api/v1/auth"
             async with aiohttp.ClientSession() as session:
                 async with session.post(
-                        url=auth_url,
-                        data={"username": settings.username, "password": settings.password},
-                        headers=headers,
+                    url=auth_url,
+                    data={"username": settings.username, "password": settings.password},
+                    headers=headers,
                 ) as response:
                     if response.status != 200:
                         raise Exception(response.status)
@@ -867,10 +822,10 @@ class ASRAsyncService(ASRService):
         transcription_timeout = aiohttp.ClientTimeout(total=1200)
         async with AsyncLocationTrustedRedirectSession(timeout=transcription_timeout) as session:
             async with session.post(
-                    url=f"{url}/api/v1/transcribe",
-                    data=data.model_dump_json(),
-                    headers=headers,
-                    location_trusted=True,
+                url=f"{url}/api/v1/transcribe",
+                data=data.model_dump_json(),
+                headers=headers,
+                location_trusted=True,
             ) as response:
                 if response.status != 200:
                     r = await response.json()
@@ -919,9 +874,7 @@ class ASRAsyncService(ASRService):
                 else:
                     return DiarizationOutput(**await response.json())
 
-    async def get_url(
-        self, task: Literal["transcription", "diarization"]
-    ) -> Union[List[str], ProcessException]:
+    async def get_url(self, task: Literal["transcription", "diarization"]) -> Union[List[str], ProcessException]:
         """Get the list of remote URLs."""
         logger.info(self.remote_services.transcription)
         logger.info(self.remote_services.diarization)
@@ -1045,9 +998,7 @@ class ASRLiveService(ASRService):
                 yield result
 
         except Exception as e:
-            logger.error(
-                f"Error in transcription gpu {gpu_index}: {e}\n{traceback.format_exc()}"
-            )
+            logger.error(f"Error in transcription gpu {gpu_index}: {e}\n{traceback.format_exc()}")
 
         finally:
             self.gpu_handler.release_device(gpu_index)
@@ -1101,9 +1052,7 @@ class ASRTranscriptionOnly(ASRService):
             logger.info(f"Warmup GPU {gpu_index}.")
             await self.process_input(data=data)
 
-    async def process_input(
-        self, data: TranscribeRequest
-    ) -> Union[TranscriptionOutput, List[TranscriptionOutput]]:
+    async def process_input(self, data: TranscribeRequest) -> Union[TranscriptionOutput, List[TranscriptionOutput]]:
         """
         Process the input data and return the results as a list of segments.
 
@@ -1216,7 +1165,7 @@ class ASRDiarizationOnly(ASRService):
                     model_index=gpu_index,
                     vad_service=self.vad_service,
                 )
-            elif data.audio_type and data.audio_type in ["youtube", "url"]:
+            elif data.audio_type and data.audio_type == "url":
                 result = self.diarization_service(
                     url=data.audio,
                     url_type=data.audio_type,
@@ -1226,10 +1175,7 @@ class ASRDiarizationOnly(ASRService):
                     vad_service=self.vad_service,
                 )
             else:
-                raise ValueError(
-                    f"Invalid audio type: {data.audio_type}. "
-                    "Must be one of ['tensor', 'youtube', 'url']."
-                )
+                raise ValueError(f"Invalid audio type: {data.audio_type}. Must be one of ['tensor', 'url'].")
 
         except Exception as e:
             result = ProcessException(

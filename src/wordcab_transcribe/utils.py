@@ -22,10 +22,11 @@
 import asyncio
 import io
 import re
-import subprocess  # noqa: S404
+import subprocess
 import sys
+from collections.abc import Awaitable
 from pathlib import Path
-from typing import TYPE_CHECKING, Awaitable, Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING
 
 import aiofiles
 import aiohttp
@@ -35,7 +36,6 @@ import soundfile as sf
 import torch
 import torchaudio
 from loguru import logger
-from yt_dlp import YoutubeDL
 
 if TYPE_CHECKING:
     from fastapi import UploadFile
@@ -59,9 +59,7 @@ async def async_run_subprocess(command: List[str]) -> tuple:
     Returns:
         tuple: Tuple with the return code, stdout and stderr.
     """
-    process = await asyncio.create_subprocess_exec(
-        *command, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-    )
+    process = await asyncio.create_subprocess_exec(*command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, stderr = await process.communicate()
 
     return process.returncode, stdout, stderr
@@ -128,9 +126,7 @@ async def check_num_channels(filepath: Union[str, Path]) -> int:
             return int(line.split("=")[1])
 
 
-def convert_timestamp(
-    timestamp: float, target: Timestamps, round_digits: Optional[int] = 3
-) -> Union[str, float]:
+def convert_timestamp(timestamp: float, target: Timestamps, round_digits: Optional[int] = 3) -> Union[str, float]:
     """
     Use the right function to convert the timestamp.
 
@@ -152,9 +148,7 @@ def convert_timestamp(
     elif target == Timestamps.seconds:
         return round(timestamp, round_digits)
     else:
-        raise ValueError(
-            f"Invalid conversion target: {target}. Valid targets are: ms, hms, s."
-        )
+        raise ValueError(f"Invalid conversion target: {target}. Valid targets are: ms, hms, s.")
 
 
 def _convert_s_to_ms(timestamp: float) -> float:
@@ -200,25 +194,21 @@ async def download_audio_file(
     Download an audio file from a URL.
 
     Args:
-        source (str): Source of the audio file. Can be "youtube" or "url".
+        source (str): Source of the audio file. Can be "url".
         url (str): URL of the audio file.
         filename (str): Filename to save the file as.
         url_headers (Optional[Dict[str, str]]): Headers to send with the request. Defaults to None.
 
     Raises:
-        ValueError: If the source is invalid. Valid sources are: youtube, url.
+        ValueError: If the source is invalid. Valid sources is url.
 
     Returns:
         Union[str, Awaitable[str]]: Path to the downloaded file.
     """
-    if source == "youtube":
-        filename = await asyncio.get_running_loop().run_in_executor(
-            None, _download_file_from_youtube, url, filename
-        )
-    elif source == "url":
+    if source == "url":
         filename = await _download_file_from_url(url, filename, url_headers)
     else:
-        raise ValueError(f"Invalid source: {source}. Valid sources are: youtube, url.")
+        raise ValueError(f"Invalid source: {source}. Valid sources is url.")
 
     return filename
 
@@ -228,55 +218,27 @@ def download_audio_file_sync(
     source: str,
     url: str,
     filename: str,
-) -> Union[str, Awaitable[str]]:
+) -> str | Awaitable[str]:
     """
     Download an audio file from a URL.
 
     Args:
-        source (str): Source of the audio file. Can be "youtube" or "url".
+        source (str): Source of the audio file. Can be "url".
         url (str): URL of the audio file.
         filename (str): Filename to save the file as.
 
     Raises:
-        ValueError: If the source is invalid. Valid sources are: youtube, url.
+        ValueError: If the source is invalid. Valid sources is url.
 
     Returns:
         Union[str, Awaitable[str]]: Path to the downloaded file.
     """
-    if source == "youtube":
-        filename = _download_file_from_youtube(url, filename)
-    elif source == "url":
+    if source == "url":
         filename = _download_file_from_url_sync(url, filename)
     else:
-        raise ValueError(f"Invalid source: {source}. Valid sources are: youtube, url.")
+        raise ValueError(f"Invalid source: {source}. Valid sources is url.")
 
     return filename
-
-
-# pragma: no cover
-def _download_file_from_youtube(url: str, filename: str) -> str:
-    """
-    Download a file from YouTube using youtube-dl.
-
-    Args:
-        url (str): URL of the YouTube video.
-        filename (str): Filename to save the file as.
-
-    Returns:
-        str: Path to the downloaded file.
-    """
-    logger.info(f"Downloading YouTube file from {url} to {filename}...")
-    with YoutubeDL(
-        {
-            "format": "bestaudio",
-            "postprocessors": [{"key": "FFmpegExtractAudio", "preferredcodec": "wav"}],
-            "outtmpl": f"{filename}",
-            "quiet": True,
-        }
-    ) as ydl:
-        ydl.download([url])
-
-    return filename + ".wav"
 
 
 # pragma: no cover
@@ -319,9 +281,7 @@ async def _download_file_from_url(
     return filename
 
 
-def _download_file_from_url_sync(
-    url: str, filename: str, url_headers: Optional[Dict[str, str]] = None
-) -> str:
+def _download_file_from_url_sync(url: str, filename: str, url_headers: Optional[Dict[str, str]] = None) -> str:
     """
     Download a file from a URL using requests.
 
@@ -376,9 +336,7 @@ def download_model(compute_type: str, language: str) -> Optional[str]:
         return None
 
     allow_patterns = ["config.json", "model.bin", "tokenizer.json", "vocabulary.*"]
-    snapshot_path = huggingface_hub.snapshot_download(
-        repo_id, local_files_only=False, allow_patterns=allow_patterns
-    )
+    snapshot_path = huggingface_hub.snapshot_download(repo_id, local_files_only=False, allow_patterns=allow_patterns)
 
     return snapshot_path
 
@@ -508,9 +466,7 @@ def format_segments(transcription_output: TranscriptionOutput) -> List[Utterance
     return formatted_segments
 
 
-async def process_audio_file(
-    filepath: str, num_channels: int = 1
-) -> Union[str, List[str]]:
+async def process_audio_file(filepath: str, num_channels: int = 1) -> Union[str, List[str]]:
     """Prepare the audio for inference.
 
     Process an audio file using ffmpeg. The file will be converted to WAV if
@@ -556,17 +512,13 @@ async def process_audio_file(
 
         result = await async_run_subprocess(cmd)
         if result[0] != 0:
-            raise Exception(
-                f"Error converting file {filepath} to wav format: {result[2]}"
-            )
+            raise Exception(f"Error converting file {filepath} to wav format: {result[2]}")
 
         return new_filepath
 
     # Split audio into N channels if num_channels >= 2
     else:
-        output_files = [
-            f"{_filepath.stem}_ch{channel}.wav" for channel in range(num_channels)
-        ]
+        output_files = [f"{_filepath.stem}_ch{channel}.wav" for channel in range(num_channels)]
 
         cmd = ["ffmpeg", "-i", filepath]
         for channel in range(num_channels):
@@ -584,9 +536,7 @@ async def process_audio_file(
 
         result = await async_run_subprocess(cmd)
         if result[0] != 0:
-            raise Exception(
-                f"Error splitting {num_channels}-channel file: {filepath}. {result[2]}"
-            )
+            raise Exception(f"Error splitting {num_channels}-channel file: {filepath}. {result[2]}")
 
         return output_files
 
@@ -663,14 +613,10 @@ def read_audio(
         wav, sr = torchaudio.load(audio)
     elif isinstance(audio, bytes):
         with io.BytesIO(audio) as buffer:
-            wav, sr = sf.read(
-                buffer, format="RAW", channels=1, samplerate=16000, subtype="PCM_16"
-            )
+            wav, sr = sf.read(buffer, format="RAW", channels=1, samplerate=16000, subtype="PCM_16")
         wav = torch.from_numpy(wav).unsqueeze(0)
     else:
-        raise ValueError(
-            f"Invalid audio type. Must be either str or bytes, got: {type(audio)}."
-        )
+        raise ValueError(f"Invalid audio type. Must be either str or bytes, got: {type(audio)}.")
 
     if wav.size(0) > 1:
         wav = wav.mean(dim=0, keepdim=True)

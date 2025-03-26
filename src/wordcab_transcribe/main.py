@@ -31,7 +31,6 @@ from wordcab_transcribe.router.authentication import get_current_user
 from wordcab_transcribe.router.v1.endpoints import (
     api_router,
     auth_router,
-    cortex_router,
 )
 
 # Main application instance creation
@@ -49,14 +48,9 @@ app.add_middleware(LoggingMiddleware, debug_mode=settings.debug)
 # Include the appropriate routers based on the settings
 if settings.debug is False:
     app.include_router(auth_router, tags=["authentication"])
-    app.include_router(
-        api_router, prefix=settings.api_prefix, dependencies=[Depends(get_current_user)]
-    )
+    app.include_router(api_router, prefix=settings.api_prefix, dependencies=[Depends(get_current_user)])
 else:
     app.include_router(api_router, prefix=settings.api_prefix)
-
-if settings.cortex_endpoint and settings.asr_type == "async":
-    app.include_router(cortex_router, tags=["cortex"])
 
 
 @app.get("/", tags=["status"])

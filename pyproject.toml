@@ -42,18 +42,24 @@ name = "pytorch-gpu"
 url = "https://download.pytorch.org/whl/cu118"
 priority = "explicit"
 
+
+[[tool.poetry.source]]
+name = "nvidia"
+url = "https://pypi.nvidia.com/"
+priority = "supplemental"
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.ruff]
-line-length = 88
+line-length = 120
 indent-width = 4
 target-version = "py312"
 
 [tool.ruff.lint]
 select = ["ALL", "RET504"]
-ignore = ["D", "C901", "BLE001", "ANN401", "RET505", "TC002"]
+ignore = ["D", "C901", "BLE001", "ANN401", "RET505", "TC002", "ERA001"]
 fixable = ["ALL"]
 unfixable = []
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"

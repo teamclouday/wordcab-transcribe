@@ -31,14 +31,12 @@ from wordcab_transcribe.router.v1.manage_remote_url import (
     router as manage_remote_url_router,
 )
 from wordcab_transcribe.router.v1.transcribe_endpoint import router as transcribe_router
-from wordcab_transcribe.router.v1.youtube_endpoint import router as youtube_router
 
 api_router = APIRouter()
 
 async_routers = [
     (audio_file_router, "/audio", "async"),
     (audio_url_router, "/audio-url", "async"),
-    (youtube_router, "/youtube", "async"),
 ]
 live_routers = (live_router, "/live", "live")
 transcribe_routers = (transcribe_router, "/transcribe", "transcription")

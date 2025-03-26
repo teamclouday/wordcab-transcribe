@@ -14,78 +14,12 @@
 
 """Automate module of the Wordcab Transcribe."""
 
-
 import json
 from typing import List, Optional
 
 import requests
 
-from wordcab_transcribe.models import AudioResponse, BaseResponse, YouTubeResponse
-
-
-def run_api_youtube(
-    url: str,
-    source_lang: str = "en",
-    timestamps: str = "s",
-    word_timestamps: bool = False,
-    diarization: bool = False,
-    server_url: Optional[str] = None,
-    vocab: Optional[List[str]] = None,
-    timeout: int = 900,
-) -> YouTubeResponse:
-    """
-    Run API call for Youtube videos.
-
-    Args:
-        url (str): URL source of the Youtube video.
-        source_lang: language of the URL source (defaulted to English)
-        timestamps: time unit of the timestamps (defaulted to seconds)
-        word_timestamps: associated words and their timestamps (defaulted to False)
-        diarization: speaker labels for utterances (defaulted to False)
-        server_url: the URL used to reach out the API
-        vocab: defaulted to empty list
-        timeout: defaulted to 90 seconds (15 minutes)
-
-    Returns:
-        AudioResponse
-    """
-    headers = {"accept": "application/json", "Content-Type": "application/json"}
-    params = {"url": url}
-    data = {
-        "diarization": diarization,
-        "source_lang": source_lang,
-        "timestamps": timestamps,
-        "word_timestamps": word_timestamps,
-    }
-    if vocab:
-        data["vocab"] = vocab
-
-    if server_url is None:
-        response = requests.post(
-            "http://localhost:5001/api/v1/youtube",
-            headers=headers,
-            params=params,
-            data=json.dumps(data),
-            timeout=timeout,
-        )
-    else:
-        response = requests.post(
-            f"http://localhost:5001/api/{server_url}",
-            # f"{server_url}/api/v1/youtube",
-            headers=headers,
-            params=params,
-            data=json.dumps(data),
-            timeout=timeout,
-        )
-
-    try:
-        r_json = response.json()
-        url_name = url.split("https://")[-1]
-        with open(f"{url_name}.json", "w", encoding="utf-8") as f:
-            json.dump(r_json, f, indent=4, ensure_ascii=False)
-        return response
-    except Exception:
-        print("An exception occurred")
+from wordcab_transcribe.models import AudioResponse, BaseResponse
 
 
 def run_audio_url(
@@ -236,10 +170,10 @@ def run_api(
     timeout: int = 900,
 ) -> BaseResponse:
     """
-    Automated function for API calls for 3 endpoints: audio files, youtube videos, and audio URLs.
+    Automated function for API calls for 2 endpoints: audio files and audio URLs.
 
     Args:
-        endpoint (str): audio_file or youtube or audioURL
+        endpoint (str): audio_file or audioURL
         source: source of the endpoint (either a URL or a filepath)
         source_lang: language of the source (defaulted to English)
         timestamps: time unit of the timestamps (defaulted to seconds)
@@ -253,18 +187,7 @@ def run_api(
     Returns:
         BaseResponse
     """
-    if endpoint == "youtube":
-        response = run_api_youtube(
-            source,
-            source_lang,
-            timestamps,
-            word_timestamps,
-            diarization,
-            server_url,
-            vocab,
-            timeout,
-        )
-    elif endpoint == "audio_file":
+    if endpoint == "audio_file":
         response = run_api_audio_file(
             source,
             source_lang,

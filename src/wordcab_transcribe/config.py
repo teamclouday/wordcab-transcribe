@@ -58,8 +58,6 @@ class Settings:
     enable_punctuation_based_alignment: bool
     # ASR type configuration
     asr_type: Literal["async", "live", "only_transcription", "only_diarization"]
-    # Endpoint configuration
-    cortex_endpoint: bool
     # API authentication configuration
     username: str
     password: str
@@ -74,9 +72,7 @@ class Settings:
     def project_name_must_not_be_none(cls, value: str):  # noqa: B902, N805
         """Check that the project_name is not None."""
         if value is None:
-            raise ValueError(
-                "`project_name` must not be None, please verify the `.env` file."
-            )
+            raise ValueError("`project_name` must not be None, please verify the `.env` file.")
 
         return value
 
@@ -131,9 +127,7 @@ class Settings:
     def align_model_compatibility_check(cls, value: str):  # noqa: B902, N805
         """Check that the whisper engine is compatible."""
         if value.lower() not in ["tiny", "small", "base", "medium"]:
-            raise ValueError(
-                "The align model must be one of `tiny`, `small`, `base`, or `medium`."
-            )
+            raise ValueError("The align model must be one of `tiny`, `small`, `base`, or `medium`.")
 
         return value
 
@@ -141,10 +135,7 @@ class Settings:
     def diarization_backend_compatibility_check(cls, value: str):  # noqa: B902, N805
         """Check that the diarization engine is compatible."""
         if value.lower() not in ["default-diarizer", "longform-diarizer"]:
-            raise ValueError(
-                "The diarization backend must be one of `default_diarizer` or"
-                " `longform_diarizer`."
-            )
+            raise ValueError("The diarization backend must be one of `default_diarizer` or `longform_diarizer`.")
 
         return value
 
@@ -152,9 +143,7 @@ class Settings:
     def version_must_not_be_none(cls, value: str):  # noqa: B902, N805
         """Check that the version is not None."""
         if value is None:
-            raise ValueError(
-                "`version` must not be None, please verify the `.env` file."
-            )
+            raise ValueError("`version` must not be None, please verify the `.env` file.")
 
         return value
 
@@ -162,9 +151,7 @@ class Settings:
     def description_must_not_be_none(cls, value: str):  # noqa: B902, N805
         """Check that the description is not None."""
         if value is None:
-            raise ValueError(
-                "`description` must not be None, please verify the `.env` file."
-            )
+            raise ValueError("`description` must not be None, please verify the `.env` file.")
 
         return value
 
@@ -172,9 +159,7 @@ class Settings:
     def api_prefix_must_not_be_none(cls, value: str):  # noqa: B902, N805
         """Check that the api_prefix is not None."""
         if value is None:
-            raise ValueError(
-                "`api_prefix` must not be None, please verify the `.env` file."
-            )
+            raise ValueError("`api_prefix` must not be None, please verify the `.env` file.")
 
         return value
 
@@ -191,10 +176,7 @@ class Settings:
             "float32",
         ]
         if value not in compute_type_values:
-            raise ValueError(
-                f"{value} is not a valid compute type. Choose one of"
-                f" {compute_type_values}."
-            )
+            raise ValueError(f"{value} is not a valid compute type. Choose one of {compute_type_values}.")
 
         return value
 
@@ -202,10 +184,7 @@ class Settings:
     def openssl_algorithm_must_be_valid(cls, value: str):  # noqa: B902, N805
         """Check that the OpenSSL algorithm is valid."""
         if value not in {"HS256", "HS384", "HS512"}:
-            raise ValueError(
-                "openssl_algorithm must be a valid algorithm, please verify the `.env`"
-                " file."
-            )
+            raise ValueError("openssl_algorithm must be a valid algorithm, please verify the `.env` file.")
 
         return value
 
@@ -213,10 +192,7 @@ class Settings:
     def access_token_expire_minutes_must_be_valid(cls, value: int):  # noqa: B902, N805
         """Check that the access token expiration is valid. Only if debug is False."""
         if value <= 0:
-            raise ValueError(
-                "access_token_expire_minutes must be positive, please verify the `.env`"
-                " file."
-            )
+            raise ValueError("access_token_expire_minutes must be positive, please verify the `.env` file.")
 
         return value
 
@@ -224,15 +200,9 @@ class Settings:
         """Post initialization checks."""
         if self.debug is False:
             if self.username == "admin" or self.username is None:  # noqa: S105
-                logger.warning(
-                    f"Username is set to `{self.username}`, which is not secure for"
-                    " production."
-                )
+                logger.warning(f"Username is set to `{self.username}`, which is not secure for production.")
             if self.password == "admin" or self.password is None:  # noqa: S105
-                logger.warning(
-                    f"Password is set to `{self.password}`, which is not secure for"
-                    " production."
-                )
+                logger.warning(f"Password is set to `{self.password}`, which is not secure for production.")
             if (
                 self.openssl_key == "0123456789abcdefghijklmnopqrstuvwyz"  # noqa: S105
                 or self.openssl_key is None
@@ -244,11 +214,7 @@ class Settings:
                     " with `openssl rand -hex 32`."
                 )
 
-        if (
-            len(self.window_lengths)
-            != len(self.shift_lengths)
-            != len(self.multiscale_weights)
-        ):
+        if len(self.window_lengths) != len(self.shift_lengths) != len(self.multiscale_weights):
             raise ValueError(
                 "Length of window_lengths, shift_lengths and multiscale_weights must"
                 f" be the same.\nFound: {len(self.window_lengths)},"
@@ -265,9 +231,7 @@ if _extra_languages is not None and _extra_languages != "":
 else:
     extra_languages = None
 
-extra_languages_model_paths = (
-    {lang: "" for lang in extra_languages} if extra_languages is not None else None
-)
+extra_languages_model_paths = {lang: "" for lang in extra_languages} if extra_languages is not None else None
 
 # Diarization scales
 _window_lengths = getenv("WINDOW_LENGTHS", None)
@@ -307,8 +271,7 @@ settings = Settings(
     version=getenv("VERSION", __version__),
     description=getenv(
         "DESCRIPTION",
-        "💬 ASR FastAPI server using faster-whisper and Auto-Tuning Spectral Clustering"
-        " for diarization.",
+        "💬 ASR FastAPI server using faster-whisper and Auto-Tuning Spectral Clustering for diarization.",
     ),
     api_prefix=getenv("API_PREFIX", "/api/v1"),
     debug=getenv("DEBUG", True),
@@ -326,13 +289,9 @@ settings = Settings(
     shift_lengths=shift_lengths,
     multiscale_weights=multiscale_weights,
     # Post-processing
-    enable_punctuation_based_alignment=getenv(
-        "ENABLE_PUNCTUATION_BASED_ALIGNMENT", True
-    ),
+    enable_punctuation_based_alignment=getenv("ENABLE_PUNCTUATION_BASED_ALIGNMENT", True),
     # ASR type
     asr_type=getenv("ASR_TYPE", "async"),
-    # Endpoints configuration
-    cortex_endpoint=getenv("CORTEX_ENDPOINT", True),
     # API authentication configuration
     username=getenv("USERNAME", "admin"),
     password=getenv("PASSWORD", "admin"),
