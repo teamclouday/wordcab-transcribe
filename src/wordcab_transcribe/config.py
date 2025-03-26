@@ -66,8 +66,6 @@ class Settings:
     openssl_key: str
     openssl_algorithm: str
     access_token_expire_minutes: int
-    # Cortex configuration
-    cortex_api_key: str
     # AWS configuration
     send_results_to_s3: bool
     aws_access_key_id: str
@@ -127,7 +125,11 @@ class Settings:
     @field_validator("whisper_engine")
     def whisper_engine_compatibility_check(cls, value: str):  # noqa: B902, N805
         """Check that the whisper engine is compatible."""
-        if value.lower() not in ["faster-whisper", "faster-whisper-batched", "tensorrt-llm"]:
+        if value.lower() not in [
+            "faster-whisper",
+            "faster-whisper-batched",
+            "tensorrt-llm",
+        ]:
             raise ValueError(
                 "The whisper engine must be one of `faster-whisper`, `faster-whisper-batched`, or `tensorrt-llm`."
             )
@@ -139,8 +141,7 @@ class Settings:
         """Check that the whisper engine is compatible."""
         if value.lower() not in ["tiny", "small", "base", "medium"]:
             raise ValueError(
-                "The align model must be one of `tiny`, `small`, `base`, or"
-                " `medium`."
+                "The align model must be one of `tiny`, `small`, `base`, or `medium`."
             )
 
         return value
@@ -347,8 +348,6 @@ settings = Settings(
     openssl_key=getenv("OPENSSL_KEY", "0123456789abcdefghijklmnopqrstuvwyz"),
     openssl_algorithm=getenv("OPENSSL_ALGORITHM", "HS256"),
     access_token_expire_minutes=getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 30),
-    # Cortex configuration
-    cortex_api_key=getenv("WORDCAB_TRANSCRIBE_API_KEY", ""),
     # AWS configuration
     send_results_to_s3=getenv("SEND_RESULTS_TO_S3", False),
     aws_access_key_id=getenv("AWS_ACCESS_KEY_ID", ""),
