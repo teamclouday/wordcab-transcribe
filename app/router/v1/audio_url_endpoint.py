@@ -21,14 +21,15 @@
 
 import asyncio
 import contextlib
+from pathlib import Path
 
 import shortuuid
-from fastapi import APIRouter, BackgroundTasks, HTTPException
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from fastapi import status as http_status
 from loguru import logger
 
 from app.config import settings
-from app.dependencies import asr, download_limit
+from app.dependencies import asr
 from app.models import (
     AudioRequest,
     AudioResponse,
@@ -45,15 +46,16 @@ router = APIRouter()
 
 @router.post("", status_code=http_status.HTTP_202_ACCEPTED)
 async def inference_with_audio_url(
+    request: Request,
     background_tasks: BackgroundTasks,
     url: str,
     data: AudioRequest | None = None,
 ) -> AudioResponse:
     """Inference endpoint with audio url."""
-    filename = f"audio_url_{shortuuid.ShortUUID().random(length=32)}"
+    filename = str(Path(settings.cache_folder) / f"audio_url_{shortuuid.ShortUUID().random(length=32)}")
     data = AudioRequest() if data is None else AudioRequest(**data.model_dump())
     try:
-        async with download_limit:
+        async with request.app.state.download_limit:
             _filepath = await download_audio_file("url", url, filename)
 
             num_channels = await check_num_channels(_filepath)
@@ -146,6 +148,10 @@ async def inference_with_audio_url(
         with contextlib.suppress(Exception):
             logger.error(result.message)
         logger.error(error_message)
-        raise
+        logger.exception(e)
+        raise HTTPException(  # noqa: B904
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(error_message),
+        )
     else:
         return result

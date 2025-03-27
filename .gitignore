@@ -26,3 +26,4 @@ nemo_storage
 nemo_local
 *.log
 .venv
+.cache

@@ -20,6 +20,7 @@
 """Configuration module of the Wordcab Transcribe."""
 
 from os import getenv
+from pathlib import Path
 from typing import Literal
 
 from dotenv import load_dotenv
@@ -40,6 +41,7 @@ class Settings:
     description: str
     api_prefix: str
     debug: bool
+    cache_folder: str
     # Models configuration
     # Whisper
     whisper_model: str
@@ -71,6 +73,13 @@ class Settings:
         if value is None:
             raise ValueError("`project_name` must not be None, please verify the `.env` file.")  # noqa: TRY003 EM101
 
+        return value
+
+    @field_validator("cache_folder")
+    @classmethod
+    def cache_folder_should_exist(cls, value: str) -> str:
+        """Check that the cache_folder exists. If not, create one"""
+        Path(value).mkdir(parents=True, exist_ok=True)
         return value
 
     @field_validator("whisper_model")
@@ -265,6 +274,7 @@ settings = Settings(
     ),
     api_prefix=getenv("API_PREFIX", "/api/v1"),
     debug=getenv("DEBUG", "True").lower() == "true",
+    cache_folder=getenv("CACHE_FOLDER", ".cache"),
     # Models configuration
     # Transcription
     whisper_model=getenv("WHISPER_MODEL", "distil-large-v2"),

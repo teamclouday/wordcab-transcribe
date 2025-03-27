@@ -36,9 +36,6 @@ from app.services.asr_service import (
 )
 from app.utils import check_ffmpeg, download_model
 
-# Define the maximum number of files to pre-download for the async ASR service
-download_limit = asyncio.Semaphore(10)
-
 # Define the ASR service to use depending on the settings
 if settings.asr_type == "live":
     asr = ASRLiveService(
@@ -77,7 +74,7 @@ else:
 
 
 @asynccontextmanager
-async def lifespan(_: FastAPI) -> AsyncGenerator[None]:
+async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     """Context manager to handle the startup and shutdown of the application."""
     if settings.asr_type in ["async", "only_transcription"]:
         if check_ffmpeg() is False:
@@ -101,7 +98,12 @@ async def lifespan(_: FastAPI) -> AsyncGenerator[None]:
                 except Exception as e:
                     logger.error(f"Error downloading model for {model}: {e}")
 
+    # Define the maximum number of files to pre-download for the async ASR service
+    app.state.download_limit = asyncio.Semaphore(10)
+
     logger.info("Warmup initialization...")
     await asr.inference_warmup()
 
     yield  # This is where the execution of the application starts
+
+    logger.info("Application shutdown...")
