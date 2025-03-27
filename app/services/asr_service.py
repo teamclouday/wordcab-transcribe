@@ -945,7 +945,7 @@ class ASRLiveService(ASRService):
 
         self.transcription_service = TranscribeService(
             model_path=whisper_model,
-            model_engine=settings.whisper_engine,
+            model_engine=settings.whisper_live_engine,
             compute_type=compute_type,
             device=self.device,
             device_index=self.device_index,

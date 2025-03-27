@@ -38,7 +38,7 @@ from app.utils import check_ffmpeg, download_model
 
 # Define the ASR service to use depending on the settings
 asr_live = ASRLiveService(
-    whisper_model=settings.whisper_model,
+    whisper_model=settings.whisper_live_model,
     compute_type=settings.compute_type,
     debug_mode=settings.debug,
 )

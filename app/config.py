@@ -45,7 +45,9 @@ class Settings:
     # Models configuration
     # Whisper
     whisper_model: str
+    whisper_live_model: str
     whisper_engine: str
+    whisper_live_engine: str
     align_model: str
     compute_type: str
     extra_languages: list[str] | None
@@ -85,7 +87,7 @@ class Settings:
     @field_validator("whisper_model")
     @classmethod
     def whisper_model_compatibility_check(cls, value: str) -> str:
-        """Check that the whisper engine is compatible."""
+        """Check that the whisper model is compatible."""
         if (
             value.lower()
             not in [
@@ -108,7 +110,41 @@ class Settings:
             and "/" not in value
         ):
             raise ValueError(  # noqa: TRY003
-                "The whisper models must be one of `tiny`, `tiny.en`, `base`,"  # noqa: EM101
+                "The whisper model must be one of `tiny`, `tiny.en`, `base`,"  # noqa: EM101
+                " `base.en`, `small`, `small.en`, `medium`, `medium.en`, `large`,"
+                " `large-v1`, `large-v2`, `large-v3`, `distil-medium.en`, `distil-large-v2`, or"
+                " `distil-large-v3`.",
+            )
+
+        return value
+
+    @field_validator("whisper_live_model")
+    @classmethod
+    def whisper_live_model_compatibility_check(cls, value: str) -> str:
+        """Check that the whisper model is compatible."""
+        if (
+            value.lower()
+            not in [
+                "tiny",
+                "tiny.en",
+                "base",
+                "base.en",
+                "small",
+                "small.en",
+                "medium",
+                "medium.en",
+                "large",
+                "large-v1",
+                "large-v2",
+                "large-v3",
+                "distil-medium.en",
+                "distil-large-v2",
+                "distil-large-v3",
+            ]
+            and "/" not in value
+        ):
+            raise ValueError(  # noqa: TRY003
+                "The whisper live model must be one of `tiny`, `tiny.en`, `base`,"  # noqa: EM101
                 " `base.en`, `small`, `small.en`, `medium`, `medium.en`, `large`,"
                 " `large-v1`, `large-v2`, `large-v3`, `distil-medium.en`, `distil-large-v2`, or"
                 " `distil-large-v3`.",
@@ -126,6 +162,20 @@ class Settings:
         ]:
             raise ValueError(  # noqa: TRY003
                 "The whisper engine must be one of `faster-whisper` or `faster-whisper-batched`.",  # noqa: EM101
+            )
+
+        return value
+
+    @field_validator("whisper_live_engine")
+    @classmethod
+    def whisper_live_engine_compatibility_check(cls, value: str) -> str:
+        """Check that the whisper engine is compatible."""
+        if value.lower() not in [
+            "faster-whisper",
+            "faster-whisper-batched",
+        ]:
+            raise ValueError(  # noqa: TRY003
+                "The whisper live engine must be one of `faster-whisper` or `faster-whisper-batched`.",  # noqa: EM101
             )
 
         return value
@@ -278,7 +328,9 @@ settings = Settings(
     # Models configuration
     # Transcription
     whisper_model=getenv("WHISPER_MODEL", "distil-large-v2"),
+    whisper_live_model=getenv("WHISPER_LIVE_MODEL", "distil-large-v2"),
     whisper_engine=getenv("WHISPER_ENGINE", "faster-whisper-batched"),
+    whisper_live_engine=getenv("WHISPER_LIVE_ENGINE", "faster-whisper"),
     align_model=getenv("ALIGN_MODEL", "tiny"),
     compute_type=getenv("COMPUTE_TYPE", "float16"),
     extra_languages=extra_languages,
