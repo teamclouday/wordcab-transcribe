@@ -33,7 +33,7 @@ torchaudio = "^2.6.0"
 transformers = "<=4.48.3"
 deepmultilingualpunctuation = "^1.0.1"
 omegaconf = "^2.3.0"
-nemo-toolkit = {version = "2.1.0", extras = ["asr"]}
+nemo-toolkit = {git = "https://github.com/teamclouday/NeMo.git", rev = "v2.2.0-fix", extras = ["asr"]}
 
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.11.2"

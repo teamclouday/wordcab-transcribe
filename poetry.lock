@@ -14,6 +14,39 @@ files = [
 ]
 
 [[package]]
+name = "accelerate"
+version = "1.5.2"
+description = "Accelerate"
+optional = false
+python-versions = ">=3.9.0"
+groups = ["main"]
+markers = "python_version >= \"3.12\""
+files = [
+    {file = "accelerate-1.5.2-py3-none-any.whl", hash = "sha256:68a3b272f6a6ffebb457bdc138581a2bf52efad6a5e0214dc46675f3edd98792"},
+    {file = "accelerate-1.5.2.tar.gz", hash = "sha256:a1cf39473edc0e42772a9d9a18c9eb1ce8ffd9e1719dc0ab80670f5c1fd4dc43"},
+]
+
+[package.dependencies]
+huggingface-hub = ">=0.21.0"
+numpy = ">=1.17,<3.0.0"
+packaging = ">=20.0"
+psutil = "*"
+pyyaml = "*"
+safetensors = ">=0.4.3"
+torch = ">=2.0.0"
+
+[package.extras]
+deepspeed = ["deepspeed"]
+dev = ["bitsandbytes", "black (>=23.1,<24.0)", "datasets", "diffusers", "evaluate", "hf-doc-builder (>=0.3.0)", "parameterized", "pytest (>=7.2.0,<=8.0.0)", "pytest-order", "pytest-subtests", "pytest-xdist", "rich", "ruff (>=0.6.4,<0.7.0)", "scikit-learn", "scipy", "timm", "torchdata (>=0.8.0)", "torchpippy (>=0.2.0)", "tqdm", "transformers"]
+quality = ["black (>=23.1,<24.0)", "hf-doc-builder (>=0.3.0)", "ruff (>=0.6.4,<0.7.0)"]
+rich = ["rich"]
+sagemaker = ["sagemaker"]
+test-dev = ["bitsandbytes", "datasets", "diffusers", "evaluate", "scikit-learn", "scipy", "timm", "torchdata (>=0.8.0)", "torchpippy (>=0.2.0)", "tqdm", "transformers"]
+test-prod = ["parameterized", "pytest (>=7.2.0,<=8.0.0)", "pytest-order", "pytest-subtests", "pytest-xdist"]
+test-trackers = ["comet-ml", "dvclive", "tensorboard", "wandb"]
+testing = ["bitsandbytes", "datasets", "diffusers", "evaluate", "parameterized", "pytest (>=7.2.0,<=8.0.0)", "pytest-order", "pytest-subtests", "pytest-xdist", "scikit-learn", "scipy", "timm", "torchdata (>=0.8.0)", "torchpippy (>=0.2.0)", "tqdm", "transformers"]
+
+[[package]]
 name = "aiofiles"
 version = "24.1.0"
 description = "File support for asyncio."
@@ -3055,16 +3088,14 @@ dill = ">=0.3.7"
 
 [[package]]
 name = "nemo-toolkit"
-version = "2.1.0"
+version = "2.2.0"
 description = "NeMo - a toolkit for Conversational AI"
 optional = false
 python-versions = ">=3.10"
 groups = ["main"]
 markers = "python_version >= \"3.12\""
-files = [
-    {file = "nemo_toolkit-2.1.0-py3-none-any.whl", hash = "sha256:3f16ca1801e362d849b3e9f15f4478c43aa19607c3fbaddc69018d4a1f514c57"},
-    {file = "nemo_toolkit-2.1.0.tar.gz", hash = "sha256:3f14d060919ae76a1d86a2f1b757cd69757e322a91b36cf177fc7ea98b021370"},
-]
+files = []
+develop = false
 
 [package.dependencies]
 braceexpand = {version = "*", optional = true, markers = "extra == \"asr\""}
@@ -3085,13 +3116,15 @@ librosa = {version = ">=0.10.2", optional = true, markers = "extra == \"asr\""}
 lightning = {version = ">2.2.1,<=2.4.0", optional = true, markers = "extra == \"asr\""}
 marshmallow = {version = "*", optional = true, markers = "extra == \"asr\""}
 mediapy = {version = "1.1.6", optional = true, markers = "extra == \"asr\""}
-numba = "*"
+numba = "0.61.0"
 numpy = ">=1.22"
 omegaconf = {version = "<=2.3", optional = true, markers = "extra == \"asr\""}
 onnx = ">=1.7.0"
 optuna = {version = "*", optional = true, markers = "extra == \"asr\""}
 packaging = {version = "*", optional = true, markers = "extra == \"asr\""}
 pandas = {version = "*", optional = true, markers = "extra == \"asr\""}
+peft = {version = "*", optional = true, markers = "extra == \"asr\""}
+protobuf = "3.20.3"
 "pyannote.core" = {version = "*", optional = true, markers = "extra == \"asr\""}
 "pyannote.metrics" = {version = "*", optional = true, markers = "extra == \"asr\""}
 pydub = {version = "*", optional = true, markers = "extra == \"asr\""}
@@ -3108,27 +3141,35 @@ soundfile = {version = "*", optional = true, markers = "extra == \"asr\""}
 sox = {version = "*", optional = true, markers = "extra == \"asr\""}
 tensorboard = "*"
 text-unidecode = "*"
-texterrors = {version = "*", optional = true, markers = "extra == \"asr\""}
+texterrors = {version = "<1.0.0", optional = true, markers = "extra == \"asr\""}
 torch = "*"
 torchmetrics = {version = ">=0.11.0", optional = true, markers = "extra == \"asr\""}
 tqdm = ">=4.41.0"
-transformers = {version = ">=4.45.0", optional = true, markers = "extra == \"asr\""}
+transformers = {version = ">=4.48.0,<=4.48.3", optional = true, markers = "extra == \"asr\""}
 wandb = {version = "*", optional = true, markers = "extra == \"asr\""}
 webdataset = {version = ">=0.2.86", optional = true, markers = "extra == \"asr\""}
 wget = "*"
 wrapt = "*"
 
 [package.extras]
-all = ["PyMCubes", "accelerated-scan", "addict", "attrdict", "black (>=24.3,<25.0)", "boto3", "braceexpand", "click (>=8.1)", "clip", "cloudpickle", "datasets", "decord", "diffusers (>=0.19.3)", "editdistance", "einops", "einops", "einops", "einops", "einops_exts", "faiss-cpu", "fasttext", "fiddle", "flask_restful", "ftfy", "g2p_en", "gdown", "h5py", "hydra-core (>1.3,<=1.3.2)", "ijson", "imageio", "inflect", "isort (>5.1.0,<6.0.0)", "janome", "jieba", "jieba", "jiwer", "jiwer (>=2.0.0)", "kaldi-python-io", "kaldiio", "kornia", "kornia", "lhotse (>=1.22.0)", "lhotse (>=1.26.0)", "librosa", "librosa (>=0.10.0)", "librosa (>=0.10.2)", "lightning (>2.2.1,<=2.4.0)", "mamba-ssm (==2.2.2)", "markdown2", "marshmallow", "matplotlib", "matplotlib", "matplotlib (>=3.3.2)", "mediapy (==1.1.6)", "megatron-energon (<3.0.0)", "nemo_text_processing", "nerfacc (>=0.5.3)", "nltk", "nltk (>=3.6.5)", "numpy (<2)", "omegaconf (<=2.3)", "open_clip_torch (==2.24.0)", "opencc", "optuna", "packaging", "pandas", "pandas", "pangu", "parameterized", "pesq", "prettytable", "progress (>=1.5)", "pyannote.core", "pyannote.metrics", "pydub", "pyloudnorm", "pypinyin", "pypinyin-dict", "pystoi", "pytest", "pytest-mock", "pytest-runner", "rapidfuzz", "resampy", "rouge_score", "ruamel.yaml", "ruamel.yaml", "sacrebleu", "sacremoses (>=0.0.43)", "scipy (>=0.14)", "scipy (>=0.14)", "seaborn", "sentence_transformers", "sentencepiece (<1.0.0)", "soundfile", "soundfile", "sox", "sox", "sphinx", "sphinxcontrib-bibtex", "tabulate (>=0.8.7)", "taming-transformers", "tensorstore (<0.1.46)", "textdistance (>=4.1.5)", "texterrors", "tiktoken (==0.7.0)", "torchdiffeq", "torchmetrics (>=0.11.0)", "torchsde", "tqdm", "transformers (>=4.45.0)", "trimesh", "wandb", "wandb", "webdataset (>=0.2.86)", "wget", "wrapt", "zarr"]
-asr = ["braceexpand", "cloudpickle", "cloudpickle", "datasets", "editdistance", "einops", "einops", "fiddle", "fiddle", "g2p_en", "hydra-core (>1.3,<=1.3.2)", "hydra-core (>1.3,<=1.3.2)", "inflect", "jiwer", "kaldi-python-io", "kaldiio", "lhotse (>=1.26.0)", "librosa (>=0.10.2)", "lightning (>2.2.1,<=2.4.0)", "lightning (>2.2.1,<=2.4.0)", "marshmallow", "mediapy (==1.1.6)", "omegaconf (<=2.3)", "omegaconf (<=2.3)", "optuna", "packaging", "pandas", "pyannote.core", "pyannote.metrics", "pydub", "pyloudnorm", "resampy", "ruamel.yaml", "sacremoses (>=0.0.43)", "scipy (>=0.14)", "sentencepiece (<1.0.0)", "soundfile", "sox", "texterrors", "torchmetrics (>=0.11.0)", "torchmetrics (>=0.11.0)", "transformers (>=4.45.0)", "transformers (>=4.45.0)", "wandb", "wandb", "webdataset (>=0.2.86)", "webdataset (>=0.2.86)"]
-audio = ["cloudpickle", "cloudpickle", "datasets", "einops", "einops", "fiddle", "fiddle", "hydra-core (>1.3,<=1.3.2)", "hydra-core (>1.3,<=1.3.2)", "inflect", "lhotse (>=1.22.0)", "librosa (>=0.10.0)", "lightning (>2.2.1,<=2.4.0)", "lightning (>2.2.1,<=2.4.0)", "matplotlib", "mediapy (==1.1.6)", "omegaconf (<=2.3)", "omegaconf (<=2.3)", "pandas", "pesq", "pystoi", "sacremoses (>=0.0.43)", "scipy (>=0.14)", "sentencepiece (<1.0.0)", "soundfile", "sox", "torchmetrics (>=0.11.0)", "torchmetrics (>=0.11.0)", "transformers (>=4.45.0)", "transformers (>=4.45.0)", "wandb", "wandb", "webdataset (>=0.2.86)", "webdataset (>=0.2.86)"]
-common = ["cloudpickle", "datasets", "einops", "fiddle", "hydra-core (>1.3,<=1.3.2)", "inflect", "lightning (>2.2.1,<=2.4.0)", "mediapy (==1.1.6)", "omegaconf (<=2.3)", "pandas", "sacremoses (>=0.0.43)", "sentencepiece (<1.0.0)", "torchmetrics (>=0.11.0)", "transformers (>=4.45.0)", "wandb", "webdataset (>=0.2.86)"]
-core = ["cloudpickle", "fiddle", "hydra-core (>1.3,<=1.3.2)", "lightning (>2.2.1,<=2.4.0)", "omegaconf (<=2.3)", "torchmetrics (>=0.11.0)", "transformers (>=4.45.0)", "wandb", "webdataset (>=0.2.86)"]
-multimodal = ["PyMCubes", "accelerated-scan", "addict", "boto3", "clip", "cloudpickle", "cloudpickle", "cloudpickle", "cloudpickle", "datasets", "datasets", "decord", "diffusers (>=0.19.3)", "einops", "einops", "einops_exts", "faiss-cpu", "fasttext", "fiddle", "fiddle", "fiddle", "fiddle", "flask_restful", "ftfy", "gdown", "h5py", "hydra-core (>1.3,<=1.3.2)", "hydra-core (>1.3,<=1.3.2)", "hydra-core (>1.3,<=1.3.2)", "hydra-core (>1.3,<=1.3.2)", "ijson", "imageio", "inflect", "inflect", "jieba", "kornia", "lightning (>2.2.1,<=2.4.0)", "lightning (>2.2.1,<=2.4.0)", "lightning (>2.2.1,<=2.4.0)", "lightning (>2.2.1,<=2.4.0)", "mamba-ssm (==2.2.2)", "markdown2", "matplotlib (>=3.3.2)", "mediapy (==1.1.6)", "mediapy (==1.1.6)", "megatron-energon (<3.0.0)", "nerfacc (>=0.5.3)", "nltk (>=3.6.5)", "numpy (<2)", "omegaconf (<=2.3)", "omegaconf (<=2.3)", "omegaconf (<=2.3)", "omegaconf (<=2.3)", "open_clip_torch (==2.24.0)", "opencc", "pandas", "pandas", "pangu", "prettytable", "rapidfuzz", "rouge_score", "sacrebleu", "sacremoses (>=0.0.43)", "sacremoses (>=0.0.43)", "sentence_transformers", "sentencepiece (<1.0.0)", "sentencepiece (<1.0.0)", "taming-transformers", "tensorstore (<0.1.46)", "tiktoken (==0.7.0)", "torchdiffeq", "torchmetrics (>=0.11.0)", "torchmetrics (>=0.11.0)", "torchmetrics (>=0.11.0)", "torchmetrics (>=0.11.0)", "torchsde", "transformers (>=4.45.0)", "transformers (>=4.45.0)", "transformers (>=4.45.0)", "transformers (>=4.45.0)", "trimesh", "wandb", "wandb", "wandb", "wandb", "webdataset (>=0.2.86)", "webdataset (>=0.2.86)", "webdataset (>=0.2.86)", "webdataset (>=0.2.86)", "zarr"]
-nlp = ["accelerated-scan", "boto3", "cloudpickle", "cloudpickle", "datasets", "einops", "faiss-cpu", "fasttext", "fiddle", "fiddle", "flask_restful", "ftfy", "gdown", "h5py", "hydra-core (>1.3,<=1.3.2)", "hydra-core (>1.3,<=1.3.2)", "ijson", "inflect", "jieba", "lightning (>2.2.1,<=2.4.0)", "lightning (>2.2.1,<=2.4.0)", "mamba-ssm (==2.2.2)", "markdown2", "matplotlib (>=3.3.2)", "mediapy (==1.1.6)", "nltk (>=3.6.5)", "numpy (<2)", "omegaconf (<=2.3)", "omegaconf (<=2.3)", "opencc", "pandas", "pangu", "prettytable", "rapidfuzz", "rouge_score", "sacrebleu", "sacremoses (>=0.0.43)", "sentence_transformers", "sentencepiece (<1.0.0)", "tensorstore (<0.1.46)", "tiktoken (==0.7.0)", "torchmetrics (>=0.11.0)", "torchmetrics (>=0.11.0)", "transformers (>=4.45.0)", "transformers (>=4.45.0)", "wandb", "wandb", "webdataset (>=0.2.86)", "webdataset (>=0.2.86)", "zarr"]
-slu = ["braceexpand", "cloudpickle", "cloudpickle", "datasets", "editdistance", "einops", "einops", "fiddle", "fiddle", "g2p_en", "hydra-core (>1.3,<=1.3.2)", "hydra-core (>1.3,<=1.3.2)", "inflect", "jiwer", "jiwer (>=2.0.0)", "kaldi-python-io", "kaldiio", "lhotse (>=1.26.0)", "librosa (>=0.10.2)", "lightning (>2.2.1,<=2.4.0)", "lightning (>2.2.1,<=2.4.0)", "marshmallow", "mediapy (==1.1.6)", "omegaconf (<=2.3)", "omegaconf (<=2.3)", "optuna", "packaging", "pandas", "progress (>=1.5)", "pyannote.core", "pyannote.metrics", "pydub", "pyloudnorm", "resampy", "ruamel.yaml", "sacremoses (>=0.0.43)", "scipy (>=0.14)", "sentencepiece (<1.0.0)", "soundfile", "sox", "tabulate (>=0.8.7)", "textdistance (>=4.1.5)", "texterrors", "torchmetrics (>=0.11.0)", "torchmetrics (>=0.11.0)", "tqdm", "transformers (>=4.45.0)", "transformers (>=4.45.0)", "wandb", "wandb", "webdataset (>=0.2.86)", "webdataset (>=0.2.86)"]
-test = ["attrdict", "cloudpickle", "cloudpickle", "datasets", "einops", "einops", "fiddle", "fiddle", "hydra-core (>1.3,<=1.3.2)", "hydra-core (>1.3,<=1.3.2)", "inflect", "janome", "jieba", "kornia", "librosa", "lightning (>2.2.1,<=2.4.0)", "lightning (>2.2.1,<=2.4.0)", "matplotlib", "mediapy (==1.1.6)", "nemo_text_processing", "nltk", "omegaconf (<=2.3)", "omegaconf (<=2.3)", "pandas", "pandas", "pypinyin", "pypinyin-dict", "sacremoses (>=0.0.43)", "seaborn", "sentencepiece (<1.0.0)", "torchmetrics (>=0.11.0)", "torchmetrics (>=0.11.0)", "transformers (>=4.45.0)", "transformers (>=4.45.0)", "wandb", "wandb", "webdataset (>=0.2.86)", "webdataset (>=0.2.86)"]
-tts = ["attrdict", "braceexpand", "cloudpickle", "cloudpickle", "cloudpickle", "cloudpickle", "datasets", "datasets", "editdistance", "einops", "einops", "einops", "einops", "fiddle", "fiddle", "fiddle", "fiddle", "g2p_en", "hydra-core (>1.3,<=1.3.2)", "hydra-core (>1.3,<=1.3.2)", "hydra-core (>1.3,<=1.3.2)", "hydra-core (>1.3,<=1.3.2)", "inflect", "inflect", "janome", "jieba", "jiwer", "kaldi-python-io", "kaldiio", "kornia", "lhotse (>=1.26.0)", "librosa", "librosa (>=0.10.2)", "lightning (>2.2.1,<=2.4.0)", "lightning (>2.2.1,<=2.4.0)", "lightning (>2.2.1,<=2.4.0)", "lightning (>2.2.1,<=2.4.0)", "marshmallow", "matplotlib", "mediapy (==1.1.6)", "mediapy (==1.1.6)", "nemo_text_processing", "nltk", "omegaconf (<=2.3)", "omegaconf (<=2.3)", "omegaconf (<=2.3)", "omegaconf (<=2.3)", "optuna", "packaging", "pandas", "pandas", "pandas", "pyannote.core", "pyannote.metrics", "pydub", "pyloudnorm", "pypinyin", "pypinyin-dict", "resampy", "ruamel.yaml", "sacremoses (>=0.0.43)", "sacremoses (>=0.0.43)", "scipy (>=0.14)", "seaborn", "sentencepiece (<1.0.0)", "sentencepiece (<1.0.0)", "soundfile", "sox", "texterrors", "torchmetrics (>=0.11.0)", "torchmetrics (>=0.11.0)", "torchmetrics (>=0.11.0)", "torchmetrics (>=0.11.0)", "transformers (>=4.45.0)", "transformers (>=4.45.0)", "transformers (>=4.45.0)", "transformers (>=4.45.0)", "wandb", "wandb", "wandb", "wandb", "webdataset (>=0.2.86)", "webdataset (>=0.2.86)", "webdataset (>=0.2.86)", "webdataset (>=0.2.86)"]
+all = ["PyMCubes", "accelerated-scan", "addict", "attrdict", "bitsandbytes (==0.45.0)", "black (>=24.3,<25.0)", "boto3", "braceexpand", "cdifflib (==1.2.6)", "click (>=8.1)", "clip", "cloudpickle", "coverage", "datasets", "decord", "diffusers (>=0.19.3)", "editdistance", "einops", "einops", "einops", "einops", "einops_exts", "faiss-cpu", "fastapi", "fasttext", "fiddle", "flask_restful", "ftfy", "g2p_en", "gdown", "h5py", "hydra-core (>1.3,<=1.3.2)", "ijson", "imageio", "inflect", "isort (>5.1.0,<6.0.0)", "janome", "jieba", "jieba", "jiwer", "jiwer (>=2.0.0)", "kaldi-python-io", "kaldiio", "kornia", "kornia", "lhotse (>=1.22.0)", "lhotse (>=1.26.0)", "librosa", "librosa (>=0.10.0)", "librosa (>=0.10.2)", "lightning (>2.2.1,<=2.4.0)", "lm-eval", "markdown2", "marshmallow", "matplotlib", "matplotlib", "matplotlib (>=3.3.2)", "mediapy (==1.1.6)", "megatron-energon (==5.2.0)", "nemo_text_processing", "nerfacc (>=0.5.3)", "nltk", "nltk (>=3.6.5)", "numpy (<2)", "nvidia-modelopt[torch] (==0.23.2)", "nvidia-pytriton", "omegaconf (<=2.3)", "open_clip_torch (==2.24.0)", "opencc", "optuna", "packaging", "pandas", "pandas", "pangu", "parameterized", "peft", "pesq", "prettytable", "progress (>=1.5)", "pyannote.core", "pyannote.metrics", "pydantic-settings", "pydub", "pyloudnorm", "pypinyin", "pypinyin-dict", "pystoi", "pytest", "pytest-coverage", "pytest-mock", "pytest-runner", "rapidfuzz", "resampy", "rouge_score", "ruamel.yaml", "ruamel.yaml", "sacrebleu", "sacremoses (>=0.0.43)", "scipy (>=0.14)", "scipy (>=0.14)", "seaborn", "sentence_transformers", "sentencepiece (<1.0.0)", "soundfile", "soundfile", "sox", "sox", "sphinx", "sphinxcontrib-bibtex", "tabulate (>=0.8.7)", "taming-transformers", "tensorstore (<0.1.72)", "tensorstore (<0.1.72)", "textdistance (>=4.1.5)", "texterrors (<1.0.0)", "tiktoken (==0.7.0)", "torchdiffeq", "torchmetrics (>=0.11.0)", "torchsde", "tqdm", "transformers (>=4.48.0,<=4.48.3)", "trimesh", "uvicorn", "wandb", "wandb", "webdataset (>=0.2.86)", "wget", "wrapt", "zarr (>=2.18.2,<3.0.0)", "zarr (>=2.18.2,<3.0.0)"]
+asr = ["braceexpand", "cloudpickle", "cloudpickle", "datasets", "editdistance", "einops", "einops", "fiddle", "fiddle", "g2p_en", "hydra-core (>1.3,<=1.3.2)", "hydra-core (>1.3,<=1.3.2)", "inflect", "jiwer", "kaldi-python-io", "kaldiio", "lhotse (>=1.26.0)", "librosa (>=0.10.2)", "lightning (>2.2.1,<=2.4.0)", "lightning (>2.2.1,<=2.4.0)", "marshmallow", "mediapy (==1.1.6)", "omegaconf (<=2.3)", "omegaconf (<=2.3)", "optuna", "packaging", "pandas", "peft", "peft", "pyannote.core", "pyannote.metrics", "pydub", "pyloudnorm", "resampy", "ruamel.yaml", "sacremoses (>=0.0.43)", "scipy (>=0.14)", "sentencepiece (<1.0.0)", "soundfile", "sox", "texterrors (<1.0.0)", "torchmetrics (>=0.11.0)", "torchmetrics (>=0.11.0)", "transformers (>=4.48.0,<=4.48.3)", "transformers (>=4.48.0,<=4.48.3)", "wandb", "wandb", "webdataset (>=0.2.86)", "webdataset (>=0.2.86)"]
+audio = ["cloudpickle", "cloudpickle", "datasets", "einops", "einops", "fiddle", "fiddle", "hydra-core (>1.3,<=1.3.2)", "hydra-core (>1.3,<=1.3.2)", "inflect", "lhotse (>=1.22.0)", "librosa (>=0.10.0)", "lightning (>2.2.1,<=2.4.0)", "lightning (>2.2.1,<=2.4.0)", "matplotlib", "mediapy (==1.1.6)", "omegaconf (<=2.3)", "omegaconf (<=2.3)", "pandas", "peft", "peft", "pesq", "pystoi", "sacremoses (>=0.0.43)", "scipy (>=0.14)", "sentencepiece (<1.0.0)", "soundfile", "sox", "torchmetrics (>=0.11.0)", "torchmetrics (>=0.11.0)", "transformers (>=4.48.0,<=4.48.3)", "transformers (>=4.48.0,<=4.48.3)", "wandb", "wandb", "webdataset (>=0.2.86)", "webdataset (>=0.2.86)"]
+common = ["cloudpickle", "datasets", "einops", "fiddle", "hydra-core (>1.3,<=1.3.2)", "inflect", "lightning (>2.2.1,<=2.4.0)", "mediapy (==1.1.6)", "omegaconf (<=2.3)", "pandas", "peft", "sacremoses (>=0.0.43)", "sentencepiece (<1.0.0)", "torchmetrics (>=0.11.0)", "transformers (>=4.48.0,<=4.48.3)", "wandb", "webdataset (>=0.2.86)"]
+core = ["cloudpickle", "fiddle", "hydra-core (>1.3,<=1.3.2)", "lightning (>2.2.1,<=2.4.0)", "omegaconf (<=2.3)", "peft", "torchmetrics (>=0.11.0)", "transformers (>=4.48.0,<=4.48.3)", "wandb", "webdataset (>=0.2.86)"]
+deploy = ["fastapi", "nvidia-pytriton", "pydantic-settings", "tensorstore (<0.1.72)", "uvicorn", "zarr (>=2.18.2,<3.0.0)"]
+eval = ["lm-eval"]
+multimodal = ["PyMCubes", "accelerated-scan", "addict", "bitsandbytes (==0.45.0)", "boto3", "clip", "cloudpickle", "cloudpickle", "cloudpickle", "cloudpickle", "datasets", "datasets", "decord", "diffusers (>=0.19.3)", "einops", "einops", "einops_exts", "faiss-cpu", "fasttext", "fiddle", "fiddle", "fiddle", "fiddle", "flask_restful", "ftfy", "gdown", "h5py", "hydra-core (>1.3,<=1.3.2)", "hydra-core (>1.3,<=1.3.2)", "hydra-core (>1.3,<=1.3.2)", "hydra-core (>1.3,<=1.3.2)", "ijson", "imageio", "inflect", "inflect", "jieba", "kornia", "lightning (>2.2.1,<=2.4.0)", "lightning (>2.2.1,<=2.4.0)", "lightning (>2.2.1,<=2.4.0)", "lightning (>2.2.1,<=2.4.0)", "markdown2", "matplotlib (>=3.3.2)", "mediapy (==1.1.6)", "mediapy (==1.1.6)", "megatron-energon (==5.2.0)", "nerfacc (>=0.5.3)", "nltk (>=3.6.5)", "numpy (<2)", "nvidia-modelopt[torch] (==0.23.2)", "omegaconf (<=2.3)", "omegaconf (<=2.3)", "omegaconf (<=2.3)", "omegaconf (<=2.3)", "open_clip_torch (==2.24.0)", "opencc", "pandas", "pandas", "pangu", "peft", "peft", "peft", "peft", "prettytable", "rapidfuzz", "rouge_score", "sacrebleu", "sacremoses (>=0.0.43)", "sacremoses (>=0.0.43)", "sentence_transformers", "sentencepiece (<1.0.0)", "sentencepiece (<1.0.0)", "taming-transformers", "tensorstore (<0.1.72)", "tiktoken (==0.7.0)", "torchdiffeq", "torchmetrics (>=0.11.0)", "torchmetrics (>=0.11.0)", "torchmetrics (>=0.11.0)", "torchmetrics (>=0.11.0)", "torchsde", "transformers (>=4.48.0,<=4.48.3)", "transformers (>=4.48.0,<=4.48.3)", "transformers (>=4.48.0,<=4.48.3)", "transformers (>=4.48.0,<=4.48.3)", "trimesh", "wandb", "wandb", "wandb", "wandb", "webdataset (>=0.2.86)", "webdataset (>=0.2.86)", "webdataset (>=0.2.86)", "webdataset (>=0.2.86)", "zarr (>=2.18.2,<3.0.0)"]
+nlp = ["accelerated-scan", "boto3", "cloudpickle", "cloudpickle", "datasets", "einops", "faiss-cpu", "fasttext", "fiddle", "fiddle", "flask_restful", "ftfy", "gdown", "h5py", "hydra-core (>1.3,<=1.3.2)", "hydra-core (>1.3,<=1.3.2)", "ijson", "inflect", "jieba", "lightning (>2.2.1,<=2.4.0)", "lightning (>2.2.1,<=2.4.0)", "markdown2", "matplotlib (>=3.3.2)", "mediapy (==1.1.6)", "nltk (>=3.6.5)", "numpy (<2)", "nvidia-modelopt[torch] (==0.23.2)", "omegaconf (<=2.3)", "omegaconf (<=2.3)", "opencc", "pandas", "pangu", "peft", "peft", "prettytable", "rapidfuzz", "rouge_score", "sacrebleu", "sacremoses (>=0.0.43)", "sentence_transformers", "sentencepiece (<1.0.0)", "tensorstore (<0.1.72)", "tiktoken (==0.7.0)", "torchmetrics (>=0.11.0)", "torchmetrics (>=0.11.0)", "transformers (>=4.48.0,<=4.48.3)", "transformers (>=4.48.0,<=4.48.3)", "wandb", "wandb", "webdataset (>=0.2.86)", "webdataset (>=0.2.86)", "zarr (>=2.18.2,<3.0.0)"]
+slu = ["braceexpand", "cloudpickle", "cloudpickle", "datasets", "editdistance", "einops", "einops", "fiddle", "fiddle", "g2p_en", "hydra-core (>1.3,<=1.3.2)", "hydra-core (>1.3,<=1.3.2)", "inflect", "jiwer", "jiwer (>=2.0.0)", "kaldi-python-io", "kaldiio", "lhotse (>=1.26.0)", "librosa (>=0.10.2)", "lightning (>2.2.1,<=2.4.0)", "lightning (>2.2.1,<=2.4.0)", "marshmallow", "mediapy (==1.1.6)", "omegaconf (<=2.3)", "omegaconf (<=2.3)", "optuna", "packaging", "pandas", "peft", "peft", "progress (>=1.5)", "pyannote.core", "pyannote.metrics", "pydub", "pyloudnorm", "resampy", "ruamel.yaml", "sacremoses (>=0.0.43)", "scipy (>=0.14)", "sentencepiece (<1.0.0)", "soundfile", "sox", "tabulate (>=0.8.7)", "textdistance (>=4.1.5)", "texterrors (<1.0.0)", "torchmetrics (>=0.11.0)", "torchmetrics (>=0.11.0)", "tqdm", "transformers (>=4.48.0,<=4.48.3)", "transformers (>=4.48.0,<=4.48.3)", "wandb", "wandb", "webdataset (>=0.2.86)", "webdataset (>=0.2.86)"]
+test = ["attrdict", "cdifflib (==1.2.6)", "cloudpickle", "cloudpickle", "datasets", "einops", "einops", "fiddle", "fiddle", "hydra-core (>1.3,<=1.3.2)", "hydra-core (>1.3,<=1.3.2)", "inflect", "janome", "jieba", "kornia", "librosa", "lightning (>2.2.1,<=2.4.0)", "lightning (>2.2.1,<=2.4.0)", "matplotlib", "mediapy (==1.1.6)", "nemo_text_processing", "nltk", "omegaconf (<=2.3)", "omegaconf (<=2.3)", "pandas", "pandas", "peft", "peft", "pypinyin", "pypinyin-dict", "sacremoses (>=0.0.43)", "seaborn", "sentencepiece (<1.0.0)", "torchmetrics (>=0.11.0)", "torchmetrics (>=0.11.0)", "transformers (>=4.48.0,<=4.48.3)", "transformers (>=4.48.0,<=4.48.3)", "wandb", "wandb", "webdataset (>=0.2.86)", "webdataset (>=0.2.86)"]
+tts = ["attrdict", "braceexpand", "cdifflib (==1.2.6)", "cloudpickle", "cloudpickle", "cloudpickle", "cloudpickle", "datasets", "datasets", "editdistance", "einops", "einops", "einops", "einops", "fiddle", "fiddle", "fiddle", "fiddle", "g2p_en", "hydra-core (>1.3,<=1.3.2)", "hydra-core (>1.3,<=1.3.2)", "hydra-core (>1.3,<=1.3.2)", "hydra-core (>1.3,<=1.3.2)", "inflect", "inflect", "janome", "jieba", "jiwer", "kaldi-python-io", "kaldiio", "kornia", "lhotse (>=1.26.0)", "librosa", "librosa (>=0.10.2)", "lightning (>2.2.1,<=2.4.0)", "lightning (>2.2.1,<=2.4.0)", "lightning (>2.2.1,<=2.4.0)", "lightning (>2.2.1,<=2.4.0)", "marshmallow", "matplotlib", "mediapy (==1.1.6)", "mediapy (==1.1.6)", "nemo_text_processing", "nltk", "omegaconf (<=2.3)", "omegaconf (<=2.3)", "omegaconf (<=2.3)", "omegaconf (<=2.3)", "optuna", "packaging", "pandas", "pandas", "pandas", "peft", "peft", "peft", "peft", "pyannote.core", "pyannote.metrics", "pydub", "pyloudnorm", "pypinyin", "pypinyin-dict", "resampy", "ruamel.yaml", "sacremoses (>=0.0.43)", "sacremoses (>=0.0.43)", "scipy (>=0.14)", "seaborn", "sentencepiece (<1.0.0)", "sentencepiece (<1.0.0)", "soundfile", "sox", "texterrors (<1.0.0)", "torchmetrics (>=0.11.0)", "torchmetrics (>=0.11.0)", "torchmetrics (>=0.11.0)", "torchmetrics (>=0.11.0)", "transformers (>=4.48.0,<=4.48.3)", "transformers (>=4.48.0,<=4.48.3)", "transformers (>=4.48.0,<=4.48.3)", "transformers (>=4.48.0,<=4.48.3)", "wandb", "wandb", "wandb", "wandb", "webdataset (>=0.2.86)", "webdataset (>=0.2.86)", "webdataset (>=0.2.86)", "webdataset (>=0.2.86)"]
+
+[package.source]
+type = "git"
+url = "https://github.com/teamclouday/NeMo.git"
+reference = "v2.2.0-fix"
+resolved_reference = "45a3ad10f37fc673fe845407cd2dccdcd473f0ad"
 
 [[package]]
 name = "networkx"
@@ -3697,6 +3738,37 @@ files = [
 [package.extras]
 qa = ["flake8 (==5.0.4)", "mypy (==0.971)", "types-setuptools (==67.2.0.1)"]
 testing = ["docopt", "pytest"]
+
+[[package]]
+name = "peft"
+version = "0.15.0"
+description = "Parameter-Efficient Fine-Tuning (PEFT)"
+optional = false
+python-versions = ">=3.9.0"
+groups = ["main"]
+markers = "python_version >= \"3.12\""
+files = [
+    {file = "peft-0.15.0-py3-none-any.whl", hash = "sha256:0dc90d13c6c111f4f9d3df5c7a34fcec5eee6f19713159622a5d9aacf3c670c6"},
+    {file = "peft-0.15.0.tar.gz", hash = "sha256:6f0ac2f98d57a8b6ee49cef9f193a9d9d2beb9ac6347bdb995d306045a6bc6b0"},
+]
+
+[package.dependencies]
+accelerate = ">=0.21.0"
+huggingface_hub = ">=0.25.0"
+numpy = ">=1.17"
+packaging = ">=20.0"
+psutil = "*"
+pyyaml = "*"
+safetensors = "*"
+torch = ">=1.13.0"
+tqdm = "*"
+transformers = "*"
+
+[package.extras]
+dev = ["black", "black", "hf-doc-builder", "hf-doc-builder", "ruff (>=0.9.2,<0.10.0)"]
+docs-specific = ["black", "hf-doc-builder"]
+quality = ["black", "hf-doc-builder", "ruff (>=0.9.2,<0.10.0)"]
+test = ["black", "black", "datasets", "diffusers", "hf-doc-builder", "hf-doc-builder", "parameterized", "protobuf", "pytest", "pytest-cov", "pytest-xdist", "ruff (>=0.9.2,<0.10.0)", "scipy", "sentencepiece"]
 
 [[package]]
 name = "pexpect"
@@ -6835,4 +6907,4 @@ propcache = ">=0.2.0"
 [metadata]
 lock-version = "2.1"
 python-versions = ">3.11,<3.13"
-content-hash = "a4603213a60922c73233eb0a0fe1118f2b79cf2a6b59b512c9bc08099ed15bbd"
+content-hash = "589df8dd656398ab0d406484e1aed1ce9894d196749cdb2e0df40fa0010fab3d"

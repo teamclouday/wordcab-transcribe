@@ -453,13 +453,14 @@ class ASRAsyncService(ASRService):
             for path in filepath:
                 _audio, _duration = read_audio(path, offset_start=offset_start, offset_end=offset_end)
 
-                audio.append(_audio)
+                audio.append(_audio.numpy())
                 durations.append(_duration)
 
             duration = sum(durations) / len(durations)
 
         else:
             audio, duration = read_audio(filepath, offset_start=offset_start, offset_end=offset_end)
+            audio = audio.numpy()
 
         gpu_index = None
         if self.remote_services.transcription.use_remote is True:
@@ -482,7 +483,7 @@ class ASRAsyncService(ASRService):
             diarization_execution = None
 
         task = ASRTask(
-            audio=audio.numpy(),
+            audio=audio,
             url=url,
             url_type=url_type,
             diarization=DiarizationTask(execution=diarization_execution, num_speakers=num_speakers),
