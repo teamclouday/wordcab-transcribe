@@ -485,7 +485,7 @@ async def process_audio_file(filepath: str, num_channels: int = 1) -> str | list
 
     # Convert to WAV if num_channels is 1
     if num_channels == 1:
-        new_filepath = f"{_filepath.stem}_{_filepath.stat().st_mtime_ns}.wav"
+        new_filepath = f"{_filepath.parent / _filepath.stem}_{_filepath.stat().st_mtime_ns}.wav"
         cmd = [
             "ffmpeg",
             "-i",
@@ -509,7 +509,7 @@ async def process_audio_file(filepath: str, num_channels: int = 1) -> str | list
 
     # Split audio into N channels if num_channels >= 2
     else:
-        output_files = [f"{_filepath.stem}_ch{channel}.wav" for channel in range(num_channels)]
+        output_files = [f"{_filepath.parent / _filepath.stem}_ch{channel}.wav" for channel in range(num_channels)]
 
         cmd = ["ffmpeg", "-i", filepath]
         for channel in range(num_channels):
@@ -554,7 +554,7 @@ def process_audio_file_sync(filepath: str) -> str | list[str]:
     if not _filepath.exists():
         raise FileNotFoundError(f"File {filepath} does not exist.")  # noqa: TRY003 EM102
 
-    new_filepath = f"{_filepath.stem}_{_filepath.stat().st_mtime_ns}.wav"
+    new_filepath = f"{_filepath.parent / _filepath.stem}_{_filepath.stat().st_mtime_ns}.wav"
     cmd = [
         "ffmpeg",
         "-i",

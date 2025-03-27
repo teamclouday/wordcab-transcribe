@@ -20,6 +20,7 @@
 """Audio file endpoint for the Wordcab Transcribe API."""
 
 import asyncio
+from pathlib import Path
 from typing import Annotated
 
 import shortuuid
@@ -27,7 +28,7 @@ from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, Uploa
 from fastapi import status as http_status
 from loguru import logger
 
-from app.dependencies import asr
+from app.dependencies import asr, settings
 from app.models import AudioRequest, AudioResponse
 from app.services.asr_service import ProcessException
 from app.utils import (
@@ -64,7 +65,7 @@ async def inference_with_audio(  # noqa: PLR0913
 ) -> AudioResponse:
     """Inference endpoint with audio file."""
     extension = file.filename.split(".")[-1] if file.filename is not None else "wav"
-    filename = f"audio_{shortuuid.ShortUUID().random(length=32)}.{extension}"
+    filename = str(Path(settings.cache_folder) / f"audio_{shortuuid.ShortUUID().random(length=32)}.{extension}")
 
     await save_file_locally(filename=filename, file=file)
 
