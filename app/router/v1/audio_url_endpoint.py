@@ -27,13 +27,13 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException
 from fastapi import status as http_status
 from loguru import logger
 
-from wordcab_transcribe.config import settings
-from wordcab_transcribe.dependencies import asr, download_limit
-from wordcab_transcribe.models import (
+from app.config import settings
+from app.dependencies import asr, download_limit
+from app.models import (
     AudioRequest,
     AudioResponse,
 )
-from wordcab_transcribe.utils import (
+from app.utils import (
     check_num_channels,
     delete_file,
     download_audio_file,

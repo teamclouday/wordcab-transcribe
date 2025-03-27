@@ -24,11 +24,11 @@ from fastapi import Depends, FastAPI
 from fastapi import status as http_status
 from fastapi.responses import HTMLResponse
 
-from wordcab_transcribe.config import settings
-from wordcab_transcribe.dependencies import lifespan
-from wordcab_transcribe.logging import LoggingMiddleware
-from wordcab_transcribe.router.authentication import get_current_user
-from wordcab_transcribe.router.v1.endpoints import (
+from app.config import settings
+from app.dependencies import lifespan
+from app.logging import LoggingMiddleware
+from app.router.authentication import get_current_user
+from app.router.v1.endpoints import (
     api_router,
     auth_router,
 )
@@ -68,11 +68,6 @@ async def home() -> HTMLResponse:
             <h1 class="text-4xl font-medium">{settings.project_name}</h1>
             <p class="text-gray-600">Version: {settings.version}</p>
             <p class="text-gray-600">{settings.description}</p>
-            <p class="mt-16 text-gray-500">If you find any issues, please report them to:</p>
-                <a class="text-blue-400 text-underlined" href="https://github.com/Wordcab/wordcab-transcribe/issues">
-                    wordcab/wordcab-transcribe
-                </a>
-            </p>
             <a href="/docs">
                 <button class="mt-8 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">Docs</button>
             </a>

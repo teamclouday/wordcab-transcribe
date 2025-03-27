@@ -18,4 +18,3 @@ noxfile.py
 test.py
 tests
 whisper_model
-wordcab_transcribe/**/__pycache__

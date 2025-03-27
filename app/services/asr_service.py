@@ -35,9 +35,9 @@ import torch
 from loguru import logger
 from pydantic import BaseModel, ConfigDict
 
-from wordcab_transcribe.config import settings
-from wordcab_transcribe.logging import time_and_tell, time_and_tell_async
-from wordcab_transcribe.models import (
+from app.config import settings
+from app.logging import time_and_tell, time_and_tell_async
+from app.models import (
     DiarizationOutput,
     DiarizationRequest,
     ProcessTimes,
@@ -47,15 +47,15 @@ from wordcab_transcribe.models import (
     UrlSchema,
     Utterance,
 )
-from wordcab_transcribe.services.concurrency_services import GPUService, URLService
-from wordcab_transcribe.services.diarization.diarize_service import DiarizeService
-from wordcab_transcribe.services.longform_diarization.diarize_service import (
+from app.services.concurrency_services import GPUService, URLService
+from app.services.diarization.diarize_service import DiarizeService
+from app.services.longform_diarization.diarize_service import (
     LongFormDiarizeService,
 )
-from wordcab_transcribe.services.post_processing_service import PostProcessingService
-from wordcab_transcribe.services.transcribe_service import TranscribeService
-from wordcab_transcribe.services.vad_service import VadService
-from wordcab_transcribe.utils import early_return, format_segments, read_audio
+from app.services.post_processing_service import PostProcessingService
+from app.services.transcribe_service import TranscribeService
+from app.services.vad_service import VadService
+from app.utils import early_return, format_segments, read_audio
 
 
 class AsyncLocationTrustedRedirectSession(aiohttp.ClientSession):
@@ -507,7 +507,7 @@ class ASRAsyncService(ASRService):
             diarization_execution = None
 
         task = ASRTask(
-            audio=audio,
+            audio=audio.numpy(),
             url=url,
             url_type=url_type,
             diarization=DiarizationTask(execution=diarization_execution, num_speakers=num_speakers),
@@ -592,11 +592,10 @@ class ASRAsyncService(ASRService):
                 out = await time_and_tell_async(
                     lambda: self.local_services.transcription(
                         audio=task.audio,
-                        model_index=task.transcription.execution.index,
                         source_lang=task.transcription.options.source_lang,
                         batch_size=task.batch_size,
                         num_beams=task.transcription.options.num_beams,
-                        suppress_blank=False,  # TODO: Add this to the options
+                        suppress_blank=False,  # NOTE: Add this to the options
                         vocab=task.transcription.options.vocab,
                         word_timestamps=task.word_timestamps,
                         internal_vad=task.transcription.options.internal_vad,

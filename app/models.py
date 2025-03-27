@@ -24,7 +24,7 @@ from typing import ClassVar, Literal, NamedTuple
 
 import numpy as np
 from faster_whisper.transcribe import Segment
-from pydantic import BaseModel, HttpUrl, field_validator
+from pydantic import BaseModel, ConfigDict, HttpUrl, field_validator
 
 
 class ProcessTimes(BaseModel):
@@ -290,6 +290,8 @@ class DiarizationRequest(BaseModel):
     duration: float
     num_speakers: int
 
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
 
 class MultiChannelTranscriptionOutput(BaseModel):
     """Multi-channel transcription output model for the API."""
@@ -315,6 +317,8 @@ class TranscribeRequest(BaseModel):
     repetition_penalty: float
     source_lang: str
     vocab: list[str] | None
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
 class Token(BaseModel):

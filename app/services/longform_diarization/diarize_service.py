@@ -31,8 +31,8 @@ from nemo.collections.asr.models import NeuralDiarizer
 from omegaconf import OmegaConf
 from pyannote.core import Annotation
 
-from wordcab_transcribe.models import DiarizationOutput
-from wordcab_transcribe.utils import (
+from app.models import DiarizationOutput
+from app.utils import (
     delete_file,
     download_audio_file_sync,
     process_audio_file_sync,
@@ -61,6 +61,7 @@ class LongFormDiarizeService:
             general_conf = json.load(f)
 
         config = OmegaConf.create(general_conf)
+        config.num_workers = 0
         self.diarization_model = NeuralDiarizer.from_pretrained(model_name="diar_msdd_telephonic").to(device)
         self.diarization_model._cfg = config  # noqa: SLF001
         # NOTE: Ability to modify config

@@ -27,7 +27,7 @@ import torch
 from faster_whisper import BatchedInferencePipeline, WhisperModel
 from loguru import logger
 
-from wordcab_transcribe.models import (
+from app.models import (
     MultiChannelSegment,
     MultiChannelTranscriptionOutput,
     TranscriptionOutput,
@@ -111,7 +111,6 @@ class TranscribeService:
         self,
         audio: str | torch.Tensor | np.ndarray | list[str] | list[torch.Tensor] | list[np.ndarray],
         source_lang: str,
-        _model_index: int,
         batch_size: int,
         num_beams: int = 1,
         suppress_blank: bool = False,

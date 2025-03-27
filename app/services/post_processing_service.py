@@ -19,8 +19,8 @@
 # and limitations under the License.
 """Post-Processing Service for audio files."""
 
-from wordcab_transcribe.config import settings
-from wordcab_transcribe.models import (
+from app.config import settings
+from app.models import (
     DiarizationOutput,
     DiarizationSegment,
     MultiChannelTranscriptionOutput,
@@ -29,7 +29,7 @@ from wordcab_transcribe.models import (
     Utterance,
     Word,
 )
-from wordcab_transcribe.utils import convert_timestamp, format_punct
+from app.utils import convert_timestamp, format_punct
 
 
 class PostProcessingService:

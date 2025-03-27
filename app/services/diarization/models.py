@@ -34,7 +34,7 @@ from loguru import logger
 from torch import nn
 from torch.nn import functional as F  # noqa: N812
 
-from wordcab_transcribe.services.diarization.modules import (
+from app.services.diarization.modules import (
     AttentivePoolLayer,
     JasperBlock,
     MaskedConv1d,
@@ -42,7 +42,7 @@ from wordcab_transcribe.services.diarization.modules import (
     StatsPoolLayer,
     init_weights,
 )
-from wordcab_transcribe.services.diarization.utils import resolve_diarization_cache_dir
+from app.services.diarization.utils import resolve_diarization_cache_dir
 
 ACTIVATION_REGISTRY = {
     "identity": nn.Identity,

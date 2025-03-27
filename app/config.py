@@ -27,7 +27,7 @@ from loguru import logger
 from pydantic import field_validator
 from pydantic.dataclasses import dataclass
 
-from wordcab_transcribe import __version__
+from app import __version__
 
 
 @dataclass

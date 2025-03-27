@@ -26,13 +26,13 @@ import numpy as np
 import torch
 from loguru import logger
 
-from wordcab_transcribe.models import DiarizationOutput
-from wordcab_transcribe.services.diarization.clustering_module import ClusteringModule
-from wordcab_transcribe.services.diarization.segmentation_module import (
+from app.models import DiarizationOutput
+from app.services.diarization.clustering_module import ClusteringModule
+from app.services.diarization.segmentation_module import (
     SegmentationModule,
 )
-from wordcab_transcribe.services.vad_service import VadService
-from wordcab_transcribe.utils import (
+from app.services.vad_service import VadService
+from app.utils import (
     delete_file,
     download_audio_file_sync,
     process_audio_file_sync,
@@ -40,7 +40,7 @@ from wordcab_transcribe.utils import (
 )
 
 if TYPE_CHECKING:
-    from wordcab_transcribe.services.diarization.models import (
+    from app.services.diarization.models import (
         MultiscaleEmbeddingsAndTimestamps,
     )
 

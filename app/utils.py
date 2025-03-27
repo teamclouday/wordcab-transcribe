@@ -40,7 +40,7 @@ from loguru import logger
 if TYPE_CHECKING:
     from fastapi import UploadFile
 
-from wordcab_transcribe.models import (
+from app.models import (
     Timestamps,
     TranscriptionOutput,
     Utterance,
@@ -449,7 +449,9 @@ def format_segments(transcription_output: TranscriptionOutput) -> list[Utterance
                     probability=word.probability,
                 )
                 for word in segment.words
-            ],
+            ]
+            if segment.words
+            else None,
         )
         for segment in transcription_output.segments
     ]

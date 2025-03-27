@@ -28,12 +28,12 @@ soundfile = "^0.13.1"
 nltk = "^3.9.1"
 python-jose = { extras = ["cryptography"], version = "^3.4.0" }
 shortuuid = "^1.0.13"
-torch = "2.2.2"
-torchaudio = "2.2.2"
+torch = "^2.6.0"
+torchaudio = "^2.6.0"
 transformers = "<=4.48.3"
 deepmultilingualpunctuation = "^1.0.1"
 omegaconf = "^2.3.0"
-nemo-toolkit = {extras = ["asr"], version = "^2.2.0"}
+nemo-toolkit = {version = "2.1.0", extras = ["asr"]}
 
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.11.2"

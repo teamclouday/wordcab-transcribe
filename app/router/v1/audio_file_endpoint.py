@@ -27,10 +27,10 @@ from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, Uploa
 from fastapi import status as http_status
 from loguru import logger
 
-from wordcab_transcribe.dependencies import asr
-from wordcab_transcribe.models import AudioRequest, AudioResponse
-from wordcab_transcribe.services.asr_service import ProcessException
-from wordcab_transcribe.utils import (
+from app.dependencies import asr
+from app.models import AudioRequest, AudioResponse
+from app.services.asr_service import ProcessException
+from app.utils import (
     check_num_channels,
     delete_file,
     process_audio_file,
@@ -43,24 +43,24 @@ router = APIRouter()
 @router.post("", response_model=AudioResponse | str, status_code=http_status.HTTP_200_OK)
 async def inference_with_audio(  # noqa: PLR0913
     background_tasks: BackgroundTasks,
-    batch_size: Annotated[int | None, Form(None)],
-    offset_start: Annotated[float | None, Form(None)],
-    offset_end: Annotated[float | None, Form(None)],
-    num_speakers: Annotated[int, Form(-1)],
-    diarization: Annotated[bool, Form(False)],  # noqa: FBT003
-    multi_channel: Annotated[bool, Form(False)],  # noqa: FBT003
-    source_lang: Annotated[str, Form("en")],
-    num_beams: Annotated[int, Form(1)],
-    timestamps: Annotated[str, Form("s")],
-    vocab: Annotated[list[str] | None, Form(None)],
-    word_timestamps: Annotated[bool, Form(False)],  # noqa: FBT003
-    internal_vad: Annotated[bool, Form(False)],  # noqa: FBT003
-    repetition_penalty: Annotated[float, Form(1.2)],
-    compression_ratio_threshold: Annotated[float, Form(2.4)],
-    log_prob_threshold: Annotated[float, Form(-1.0)],
-    no_speech_threshold: Annotated[float, Form(0.6)],
-    condition_on_previous_text: Annotated[bool, Form(True)],  # noqa: FBT003
     file: Annotated[UploadFile, File(...)],
+    batch_size: Annotated[int | None, Form()] = None,
+    offset_start: Annotated[float | None, Form()] = None,
+    offset_end: Annotated[float | None, Form()] = None,
+    num_speakers: Annotated[int, Form()] = -1,
+    diarization: Annotated[bool, Form()] = False,
+    multi_channel: Annotated[bool, Form()] = False,
+    source_lang: Annotated[str, Form()] = "en",
+    num_beams: Annotated[int, Form()] = 1,
+    timestamps: Annotated[str, Form()] = "s",
+    vocab: Annotated[list[str] | None, Form()] = None,
+    word_timestamps: Annotated[bool, Form()] = False,
+    internal_vad: Annotated[bool, Form()] = False,
+    repetition_penalty: Annotated[float, Form()] = 1.2,
+    compression_ratio_threshold: Annotated[float, Form()] = 2.4,
+    log_prob_threshold: Annotated[float, Form()] = -1.0,
+    no_speech_threshold: Annotated[float, Form()] = 0.6,
+    condition_on_previous_text: Annotated[bool, Form()] = True,
 ) -> AudioResponse:
     """Inference endpoint with audio file."""
     extension = file.filename.split(".")[-1] if file.filename is not None else "wav"

@@ -20,7 +20,7 @@ from pathlib import Path
 import requests
 from loguru import logger
 
-from wordcab_transcribe.models import AudioResponse, BaseResponse
+from app.models import AudioResponse, BaseResponse
 
 
 def run_audio_url(  # noqa: PLR0913

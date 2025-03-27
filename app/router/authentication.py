@@ -28,8 +28,8 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
 from loguru import logger
 
-from wordcab_transcribe.config import settings
-from wordcab_transcribe.models import Token, TokenData
+from app.config import settings
+from app.models import Token, TokenData
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.api_prefix}/auth")
 

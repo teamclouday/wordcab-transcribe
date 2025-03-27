@@ -21,7 +21,7 @@
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
-from wordcab_transcribe.dependencies import asr
+from app.dependencies import asr
 
 router = APIRouter()
 

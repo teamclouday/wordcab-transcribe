@@ -17,29 +17,29 @@
 #
 # See the License for the specific language governing permissions
 # and limitations under the License.
-"""Transcribe endpoint for the Remote Wordcab Transcribe API."""
+"""Diarize endpoint for the Remote Wordcab Transcribe API."""
 
 from fastapi import APIRouter, HTTPException
 from fastapi import status as http_status
 from loguru import logger
 
-from wordcab_transcribe.dependencies import asr
-from wordcab_transcribe.models import TranscribeRequest, TranscriptionOutput
-from wordcab_transcribe.services.asr_service import ProcessException
+from app.dependencies import asr
+from app.models import DiarizationOutput, DiarizationRequest
+from app.services.asr_service import ProcessException
 
 router = APIRouter()
 
 
 @router.post(
     "",
-    response_model=TranscriptionOutput | list[TranscriptionOutput] | str,
+    response_model=DiarizationOutput | str,
     status_code=http_status.HTTP_200_OK,
 )
-async def only_transcription(
-    data: TranscribeRequest,
-) -> TranscriptionOutput | list[TranscriptionOutput]:
-    """Transcribe endpoint for the `only_transcription` asr type."""
-    result: TranscriptionOutput | list[TranscriptionOutput] = await asr.process_input(data)
+async def remote_diarization(
+    data: DiarizationRequest,
+) -> DiarizationOutput:
+    """Diarize endpoint for the `only_diarization` asr type."""
+    result: DiarizationOutput = await asr.process_input(data)
 
     if isinstance(result, ProcessException):
         logger.error(result.message)

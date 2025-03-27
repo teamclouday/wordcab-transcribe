@@ -26,9 +26,9 @@ from fastapi import status as http_status
 from loguru import logger
 from pydantic import HttpUrl
 
-from wordcab_transcribe.dependencies import asr
-from wordcab_transcribe.models import UrlSchema
-from wordcab_transcribe.services.asr_service import ExceptionSource, ProcessException
+from app.dependencies import asr
+from app.models import UrlSchema
+from app.services.asr_service import ExceptionSource, ProcessException
 
 router = APIRouter()
 

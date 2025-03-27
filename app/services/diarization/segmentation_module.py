@@ -25,11 +25,11 @@ import torch
 from torch.cuda.amp import autocast
 from torch.utils.data import DataLoader, Dataset
 
-from wordcab_transcribe.services.diarization.models import (
+from app.services.diarization.models import (
     EncDecSpeakerLabelModel,
     MultiscaleEmbeddingsAndTimestamps,
 )
-from wordcab_transcribe.services.diarization.utils import segmentation_collate_fn
+from app.services.diarization.utils import segmentation_collate_fn
 
 
 class AudioSegmentDataset(Dataset):

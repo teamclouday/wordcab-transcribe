@@ -27,18 +27,14 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from loguru import logger
 
-from wordcab_transcribe.config import settings
-from wordcab_transcribe.services.asr_service import (
+from app.config import settings
+from app.services.asr_service import (
     ASRAsyncService,
     ASRDiarizationOnly,
     ASRLiveService,
     ASRTranscriptionOnly,
 )
-from wordcab_transcribe.utils import (
-    check_ffmpeg,
-    download_model,
-    retrieve_user_platform,
-)
+from app.utils import check_ffmpeg, download_model
 
 # Define the maximum number of files to pre-download for the async ASR service
 download_limit = asyncio.Semaphore(10)
@@ -85,14 +81,6 @@ else:
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncGenerator[None]:
     """Context manager to handle the startup and shutdown of the application."""
-    if retrieve_user_platform() != "linux":
-        logger.warning(
-            "You are not running the application on Linux.\nThe application was tested"
-            " on Ubuntu 22.04, so we cannot guarantee that it will work on other"
-            " OS.\nReport any issues with your env specs to:"
-            " https://github.com/Wordcab/wordcab-transcribe/issues",
-        )
-
     if settings.asr_type in ["async", "only_transcription"]:
         if check_ffmpeg() is False:
             logger.warning(

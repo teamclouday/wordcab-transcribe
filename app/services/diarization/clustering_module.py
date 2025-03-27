@@ -43,10 +43,10 @@
 
 import torch
 
-from wordcab_transcribe.services.diarization.models import (
+from app.services.diarization.models import (
     MultiscaleEmbeddingsAndTimestamps,
 )
-from wordcab_transcribe.services.diarization.utils import (
+from app.services.diarization.utils import (
     add_anchor_embeddings,
     eigen_decompose,
     estimate_number_of_speakers,
