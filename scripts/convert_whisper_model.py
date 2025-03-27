@@ -1,3 +1,4 @@
+# noqa: INP001
 # This script converts a whisper model to a ctranslate2 model.
 # Use this script to convert a model from the HuggingFace Hub to a ctranslate2 model.
 # E.g. `python convert_whisper_model.py -p openai/whisper-large-v2 -o whisper-large-v2 -q int8_float16`
@@ -9,7 +10,8 @@
 
 import argparse
 import importlib
-import subprocess  # noqa: S404
+import subprocess
+import sys
 
 
 def check_dependency(module_name: str) -> None:
@@ -23,20 +25,15 @@ def check_dependency(module_name: str) -> None:
         importlib.import_module(module_name)
 
     except ImportError:
-        print(
-            f"Error: {module_name} module not found. Please make sure it is installed"
-            " and try again."
-        )
-        exit(1)
+        print(f"Error: {module_name} module not found. Please make sure it is installed and try again.")  # noqa: T201
+        sys.exit(1)
 
 
 if __name__ == "__main__":
     check_dependency("ctranslate2")
     check_dependency("transformers")
 
-    parser = argparse.ArgumentParser(
-        description="Convert a whisper model to ctranslate2"
-    )
+    parser = argparse.ArgumentParser(description="Convert a whisper model to ctranslate2")
 
     parser.add_argument(
         "-p",
@@ -44,9 +41,7 @@ if __name__ == "__main__":
         type=str,
         help="Path to the whisper model stored on the HuggingFace Hub.",
     )
-    parser.add_argument(
-        "-o", "--output_path", type=str, help="Path to the output directory."
-    )
+    parser.add_argument("-o", "--output_path", type=str, help="Path to the output directory.")
     parser.add_argument(
         "-q",
         "--quantization",
@@ -64,12 +59,12 @@ if __name__ == "__main__":
         "int16",
         "float16",
     ]:
-        print(
+        print(  # noqa: T201
             f"Error: {args.quantization} is not a valid quantization type."
             "Please choose between 'int8', 'int8_float16', 'int16' or 'float16'."
-            "If you don't want to quantize the model, don't use the '-q' option."
+            "If you don't want to quantize the model, don't use the '-q' option.",
         )
-        exit(1)
+        sys.exit(1)
 
     command = [
         "ct2-transformers-converter",
@@ -81,11 +76,9 @@ if __name__ == "__main__":
     if args.quantization:
         command.extend(["--quantization", args.quantization])
 
-    process = subprocess.Popen(  # noqa: S603,S607
-        command, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-    )
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)  # noqa: S603
     stdout, stderr = process.communicate()
 
     if process.returncode != 0:
-        print(f"Error: {stderr.decode('utf-8')}")
-        exit(1)
+        print(f"Error: {stderr.decode('utf-8')}")  # noqa: T201
+        sys.exit(1)

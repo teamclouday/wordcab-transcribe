@@ -24,4 +24,6 @@ whisper_model_he
 storage
 nemo_storage
 nemo_local
-error.log
+*.log
+.venv
+.cache

@@ -1,186 +1,89 @@
-[build-system]
-build-backend = "hatchling.build"
-requires = ["hatchling"]
-
-[project]
-name = "wordcab-transcribe"
-dynamic = ["version"]
+[tool.poetry]
+name = "whisper-api"
+version = "0.5.3"
 description = "💬 ASR FastAPI server using faster-whisper and Auto-Tuning Spectral Clustering for diarization."
-readme = "README.md"
-requires-python = "==3.10.12"
-keywords = ["asr", "fastapi", "faster-whisper", "diarization", "wordcab"]
 authors = [
-  { name = "Aleksander Smechov", email = "aleks@wordcab.com" },
-  { name = "Thomas Chaigneau", email = "info@wordcab.com" },
+  "Aleksander Smechov <aleks@wordcab.com>",
+  "Thomas Chaigneau <info@wordcab.com>",
+  "teamclouday <teamclouday@gmail.com>",
 ]
-classifiers = [
-  "Topic :: Internet",
-  "Topic :: Software Development",
-  "Intended Audience :: Developers",
-  "Programming Language :: Python",
-  "Programming Language :: Python :: 3 :: Only",
-  "Programming Language :: Python :: 3.8",
-  "Programming Language :: Python :: 3.9",
-  "Programming Language :: Python :: 3.10",
-  "Programming Language :: Python :: 3.11",
-  "Programming Language :: Python :: Implementation :: CPython",
-  "Programming Language :: Python :: Implementation :: PyPy",
-]
-dependencies = [
-  "tensorrt_llm==0.9.0.dev2024032600",
-  "Cython==3.0.10",
-  "youtokentome @ git+https://github.com/gburlet/YouTokenToMe.git@dependencies",
-  "deepmultilingualpunctuation==1.0.1",
-  "nemo_toolkit[asr]==1.23.0",
-  "aiohttp==3.9.3",
-  "aiofiles==23.2.1",
-  "boto3",
-  "faster-whisper @ https://github.com/SYSTRAN/faster-whisper/archive/refs/heads/master.tar.gz",
-  "ffmpeg-python==0.2.0",
-  "transformers==4.38.2",
-  "librosa==0.10.1",
-  "loguru==0.7.2",
-  "nltk==3.8.1",
-  "numpy==1.26.4",
-  "onnxruntime==1.17.1",
-  "pandas==2.2.1",
-  "pydantic==2.6.4",
-  "python-dotenv==1.0.1",
-  "tensorshare==0.1.1",
-  "torch==2.2.2",
-  "torchaudio==2.2.2",
-  "wget==3.2.0",
-  "yt-dlp==2024.3.10",
-  "tiktoken==0.6.0",
-  "datasets==2.18.0",
-  "kaldialign==0.9.0",
-  "openai-whisper==v20231117",
-  "soundfile==0.12.1",
-  "safetensors==0.4.2",
-  "janus==1.0.0",
-  "backports.lzma==0.0.14",
-]
+readme = "README.md"
+package-mode = false
 
-[project.urls]
-Documentation = "https://github.com/Wordcab/wordcab-transcribe/blob/main/README.md"
-Issues = "https://github.com/Wordcab/wordcab-transcribe/issues"
-Source = "https://github.com/Wordcab/wordcab-transcribe"
+[tool.poetry.dependencies]
+python = ">3.11,<3.13"
+aiohttp = "^3.11.14"
+aiofiles = "^24.1.0"
+faster-whisper = "^1.1.1"
+loguru = "^0.7.3"
+numpy = "<2.0.0"
+pandas = "^2.2.3"
+fastapi = "^0.115.12"
+pydantic = "^2.10.6"
+uvicorn = "^0.34.0"
+websockets = "^15.0.1"
+python-multipart = "^0.0.20"
+python-dotenv = "^1.1.0"
+soundfile = "^0.13.1"
+nltk = "^3.9.1"
+python-jose = { extras = ["cryptography"], version = "^3.4.0" }
+shortuuid = "^1.0.13"
+torch = "^2.6.0"
+torchaudio = "^2.6.0"
+transformers = "<=4.48.3"
+deepmultilingualpunctuation = "^1.0.1"
+omegaconf = "^2.3.0"
+nemo-toolkit = {git = "https://github.com/teamclouday/NeMo.git", rev = "v2.2.0-fix", extras = ["asr"]}
 
-[tool.hatch.version]
-path = "src/wordcab_transcribe/__init__.py"
+[tool.poetry.group.dev.dependencies]
+ruff = "^0.11.2"
+ipython = "^9.0.2"
 
-[tool.hatch.metadata]
-allow-direct-references = true
 
-[tool.hatch.envs.default.env-vars]
-PIP_EXTRA_INDEX_URL = "https://pypi.nvidia.com"
+[[tool.poetry.source]]
+name = "pytorch-gpu"
+url = "https://download.pytorch.org/whl/cu118"
+priority = "explicit"
 
-[project.optional-dependencies]
-runtime = [
-  "argon2-cffi==23.1.0",
-  "fastapi==0.110.0",
-  "python-jose[cryptography]==3.3.0",
-  "python-multipart==0.0.9",
-  "shortuuid==1.0.13",
-  "svix==1.21.0",
-  "uvicorn==0.29.0",
-  "websockets==12.0",
-]
-docs = [
-  "mkdocs==1.5.3",
-  "mkdocs-material==9.5.14",
-  "mkdocs-git-revision-date-localized-plugin==1.2.4",
-  "mkdocstrings[python]==0.24.1",
-]
-quality = [
-  "black==24.3.0",
-  "ruff==0.3.4",
-  "pre-commit==3.6.2",
-]
-tests = [
-  "httpx==0.27.0",
-  "pytest==8.1.1",
-  "pytest-asyncio==0.23.6",
-  "pytest-cov==4.1.0",
-]
-dev = ["wordcab_transcribe[quality,runtime,tests]"]
 
-[tool.hatch.envs.runtime]
-features = [
-  "runtime",
-]
+[[tool.poetry.source]]
+name = "nvidia"
+url = "https://pypi.nvidia.com/"
+priority = "supplemental"
 
-[tool.hatch.envs.runtime.scripts]
-launch = "uvicorn --host=0.0.0.0 --port=5001 src.wordcab_transcribe.main:app"
-
-[tool.hatch.envs.quality]
-features = [
-  "quality",
-]
-
-[tool.hatch.envs.quality.scripts]
-check = [
-  "black --check --diff --preview src tests",
-  "ruff src tests",
-]
-format = [
-  "black --preview src tests",
-  "ruff --fix src tests",
-  "check",
-]
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
 
 [tool.ruff]
+line-length = 120
+indent-width = 4
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["ALL", "RET504"]
 ignore = [
-  "E501", # line too long, handled by black
-  "B008", # do not perform function calls in argument defaults
-  "C901", # too complex
-  "B905", # use of assert
+  "D",
+  "C901",
+  "BLE001",
+  "ANN401",
+  "RET505",
+  "TC002",
+  "ERA001",
+  "FBT001",
+  "FBT002",
 ]
-select = [
-  "E", # pycodestyle errors
-  "W", # pycodestyle warnings
-  "F", # pyflakes
-  "I", # isort
-  "C", # flake8-comprehensions
-  "B", # flake8-bugbear
-]
+fixable = ["ALL"]
+unfixable = []
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 
-[tool.ruff.isort]
-known-first-party = ["wordcab_transcribe"]
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+docstring-code-format = false
+docstring-code-line-length = "dynamic"
 
-[tool.hatch.envs.tests]
-features = [
-  "tests",
-]
-
-[tool.hatch.envs.tests.scripts]
-run = "pytest --cov=wordcab_transcribe --cov-report=term-missing tests/ --durations 0 -s -vv"
-
-[tool.hatch.envs.docs]
-features = [
-  "docs",
-]
-
-[tool.hatch.envs.docs.scripts]
-build = [
-  "mkdocs build",
-]
-serve = [
-  "mkdocs serve",
-]
-
-[[tool.hatch.envs.tests.matrix]]
-python = ["310"]
-
-[tool.hatch.build.targets.sdist]
-exclude = [
-  "/.github",
-  "/.vscode",
-  "/docs",
-  "/.devcontainer",
-  "/.pre-commit-config.yaml",
-  "/.gitignore",
-  "/tests",
-  "/Dockerfile",
-  "/.dockerignore",
-]
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
