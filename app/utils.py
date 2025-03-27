@@ -651,7 +651,12 @@ async def save_file_locally(filename: str, file: "UploadFile") -> bool:
         bool: Whether the file was saved successfully.
     """
     async with aiofiles.open(filename, "wb") as f:
-        audio_bytes = await file.read()
-        await f.write(audio_bytes)
+        while True:
+            chunk = await file.read(1024)
+
+            if not chunk:
+                break
+
+            await f.write(chunk)
 
     return True
