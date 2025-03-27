@@ -28,12 +28,20 @@ soundfile = "^0.13.1"
 nltk = "^3.9.1"
 python-jose = { extras = ["cryptography"], version = "^3.4.0" }
 shortuuid = "^1.0.13"
-torch = "^2.6.0"
-torchaudio = "^2.6.0"
+torch = [
+  { version = "^2.6.0", source = "pytorch-gpu", platform = "!darwin" },
+  { version = "^2.6.0", source = "pypi", platform = "darwin" },
+]
+torchaudio = [
+  { version = "^2.6.0", source = "pytorch-gpu", platform = "!darwin" },
+  { version = "^2.6.0", source = "pypi", platform = "darwin" },
+]
 transformers = "<=4.48.3"
 deepmultilingualpunctuation = "^1.0.1"
 omegaconf = "^2.3.0"
-nemo-toolkit = {git = "https://github.com/teamclouday/NeMo.git", rev = "v2.2.0-fix", extras = ["asr"]}
+nemo-toolkit = { git = "https://github.com/teamclouday/NeMo.git", rev = "v2.2.0-fix", extras = [
+  "asr",
+] }
 
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.11.2"
@@ -45,11 +53,6 @@ name = "pytorch-gpu"
 url = "https://download.pytorch.org/whl/cu118"
 priority = "explicit"
 
-
-[[tool.poetry.source]]
-name = "nvidia"
-url = "https://pypi.nvidia.com/"
-priority = "supplemental"
 
 [build-system]
 requires = ["poetry-core"]

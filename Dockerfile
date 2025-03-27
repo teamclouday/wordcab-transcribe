@@ -1,86 +1,76 @@
-FROM nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04 AS runtime
+################################
+# BUILDER
+# Used to build deps + create our virtual environment
+################################
+FROM nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04 AS builder
 
-ENV NVIDIA_DRIVER_CAPABILITIES ${NVIDIA_DRIVER_CAPABILITIES:-compute,utility}
-ENV PYTHONUNBUFFERED=1
-ENV DEBIAN_FRONTEND=noninteractive
-ENV MPI4PY_VERSION="3.1.5"
-ENV RELEASE_URL="https://github.com/mpi4py/mpi4py/archive/refs/tags/${MPI4PY_VERSION}.tar.gz"
+# Set environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=on \
+    PIP_DEFAULT_TIMEOUT=100 \
+    POETRY_VERSION=1.8.3 \
+    POETRY_NO_INTERACTION=1 \
+    POETRY_VIRTUALENVS_CREATE=false \
+    VIRTUAL_ENV="/venv"
 
+# Install Python and required build tools
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libsndfile1 \
-    software-properties-common \
-    ffmpeg \
-    build-essential \
-    ca-certificates \
-    ccache \
-    cmake \
-    gnupg2 \
-    wget \
-    git \
-    curl \
-    gdb \
-    openmpi-bin \
-    libopenmpi-dev \
-    libffi-dev \
-    libssl-dev \
+    python3.12 \
+    python3.12-dev \
+    python3.12-venv \
     python3-pip \
-    libbz2-dev \
-    python3-dev \
-    liblzma-dev \
-    libsqlite3-dev \
-    libtiff-tools=4.3.0-6ubuntu0.10 \
-    libtiff5=4.3.0-6ubuntu0.10 \
-    libgnutls30=3.7.3-4ubuntu1.5 \
-    openssl=3.0.2-0ubuntu1.18 \
-    libpam-modules=1.4.0-11ubuntu2.4 \
-    libpam-modules-bin=1.4.0-11ubuntu2.4 \
-    libpam-runtime=1.4.0-11ubuntu2.4 \
-    libpam0g=1.4.0-11ubuntu2.4 \
-    login=1:4.8.1-2ubuntu2.2 \
-    passwd=1:4.8.1-2ubuntu2.2 \
-    uidmap=1:4.8.1-2ubuntu2.2 \
-    binutils=2.38-4ubuntu2.6 \
+    build-essential \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
-RUN cd /tmp && \
-    wget https://www.python.org/ftp/python/3.10.12/Python-3.10.12.tgz && \
-    tar -xvf Python-3.10.12.tgz && \
-    cd Python-3.10.12 && \
-    ./configure --enable-optimizations --with-ssl && \
-    make && make install && \
-    cd .. && rm -r Python-3.10.12 && \
-    ln -s /usr/local/bin/python3 /usr/local/bin/python && \
-    ln -s /usr/local/bin/pip3 /usr/local/bin/pip
+# Create symlinks for python
+RUN ln -sf /usr/bin/python3.12 /usr/bin/python && \
+    ln -sf /usr/bin/python3.12 /usr/bin/python3
 
-RUN export CUDNN_PATH=$(python -c 'import os; import nvidia.cublas.lib; import nvidia.cudnn.lib; print(os.path.dirname(nvidia.cublas.lib.__file__) + ":" + os.path.dirname(nvidia.cudnn.lib.__file__))') && \
-    echo 'export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:'${CUDNN_PATH} >> ~/.bashrc
+# Create venv and install poetry
+RUN python -m venv $VIRTUAL_ENV && \
+    $VIRTUAL_ENV/bin/pip install "poetry==$POETRY_VERSION"
 
-RUN curl -L ${RELEASE_URL} | tar -zx -C /tmp \
-    && sed -i 's/>= 40\\.9\\.0/>= 40.9.0, < 69/g' /tmp/mpi4py-${MPI4PY_VERSION}/pyproject.toml \
-    && pip install /tmp/mpi4py-${MPI4PY_VERSION} \
-    && rm -rf /tmp/mpi4py*
+# Add venv to path
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
-RUN python -m pip install pip --upgrade
-
-COPY faster-whisper /app/faster-whisper
-
-COPY pre_requirements.txt .
-COPY requirements.txt .
-
-RUN pip install --no-cache-dir --extra-index-url https://pypi.nvidia.com -r pre_requirements.txt -r requirements.txt
-
+# Install dependencies only
 WORKDIR /app
+COPY poetry.lock pyproject.toml ./
 
-RUN git clone https://github.com/NVIDIA/NeMo.git ./nemo_local && \
-    cd ./nemo_local && \
-    git config --global user.email "you@example.com" && \
-    git config --global user.name "Your Name" && \
-    git fetch origin pull/9114/head:pr9114 && \
-    git merge pr9114 && \
-    pip install -e ".[asr]"
+# Install runtime dependencies with caching
+RUN --mount=type=cache,target=/root/.cache/pip \
+    poetry install --no-root --only main
 
-ENV PYTHONPATH="/app/src"
+################################
+# PRODUCTION
+# Final image used for runtime
+################################
+FROM nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04 AS final
 
-COPY . .
+# Set environment variables
+ENV PYTHONUNBUFFERED=1 \
+    VIRTUAL_ENV="/venv" \
+    PYTHONPATH="/app:$PYTHONPATH"
 
-CMD ["uvicorn", "--host=0.0.0.0", "--port=5001", "src.wordcab_transcribe.main:app"]
+# Install Python
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3.12 \
+    python3-pip \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create symlinks for python
+RUN ln -sf /usr/bin/python3.12 /usr/bin/python && \
+    ln -sf /usr/bin/python3.12 /usr/bin/python3
+
+# Copy venv from builder stage
+COPY --from=builder $VIRTUAL_ENV $VIRTUAL_ENV
+
+# Copy application code
+WORKDIR /app
+COPY app/ app/
+COPY .env.production .env
+
+# Run the application
+EXPOSE 8000
+CMD ["uvicorn", "app.main:app", "--proxy-headers", "--host", "0.0.0.0", "--port", "8000"]
