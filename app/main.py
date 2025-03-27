@@ -20,6 +20,9 @@
 
 """Main API module of the Wordcab Transcribe."""
 
+from pathlib import Path
+
+import aiofiles
 from fastapi import Depends, FastAPI
 from fastapi import status as http_status
 from fastapi.middleware.cors import CORSMiddleware
@@ -79,6 +82,9 @@ async def home() -> HTMLResponse:
             <a href="/docs">
                 <button class="mt-8 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">Docs</button>
             </a>
+            <a href="/demo">
+                <button class="mt-2 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">Demo</button>
+            </a>
         </div>
     </body>
     </html>
@@ -90,3 +96,11 @@ async def home() -> HTMLResponse:
 async def health() -> dict:
     """Health check endpoint. Important for Kubernetes liveness probe."""
     return {"status": "ok"}
+
+
+@app.get("/demo", tags=["status"])
+async def demo() -> HTMLResponse:
+    """Demo endpoint returning a simple HTML page with the project info."""
+    async with aiofiles.open(Path(__file__).parent / "assets" / "demo.html") as f:
+        content = await f.read()
+    return HTMLResponse(content=content, media_type="text/html")

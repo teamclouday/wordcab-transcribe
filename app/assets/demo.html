@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>KulaMind Transcribe API Demo</title>
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+        line-height: 1.6;
+      }
+      h1 {
+        color: #333;
+        text-align: center;
+      }
+      .test-section {
+        background-color: #f5f5f5;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 30px;
+      }
+      .response-area {
+        width: 100%;
+        min-height: 150px;
+        margin-top: 10px;
+        font-family: monospace;
+        border-radius: 5px;
+        padding: 10px;
+        box-sizing: border-box;
+      }
+      button {
+        background-color: #4caf50;
+        border: none;
+        color: white;
+        padding: 10px 15px;
+        text-align: center;
+        text-decoration: none;
+        display: inline-block;
+        font-size: 16px;
+        margin: 4px 2px;
+        cursor: pointer;
+        border-radius: 5px;
+      }
+      button:disabled {
+        background-color: #cccccc;
+        cursor: not-allowed;
+      }
+      button.recording {
+        background-color: #f44336;
+      }
+      input[type="text"],
+      input[type="file"] {
+        width: 100%;
+        padding: 12px 20px;
+        margin: 8px 0;
+        display: inline-block;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        box-sizing: border-box;
+      }
+      #status {
+        color: #f44336;
+        margin-top: 10px;
+      }
+      .toggle-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 20px;
+        background-color: #f5f5f5;
+        padding: 15px;
+        border-radius: 10px;
+      }
+      .switch {
+        position: relative;
+        display: inline-block;
+        width: 60px;
+        height: 34px;
+        margin: 0 10px;
+      }
+      .switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+      }
+      .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #ccc;
+        transition: 0.4s;
+        border-radius: 34px;
+      }
+      .slider:before {
+        position: absolute;
+        content: "";
+        height: 26px;
+        width: 26px;
+        left: 4px;
+        bottom: 4px;
+        background-color: white;
+        transition: 0.4s;
+        border-radius: 50%;
+      }
+      input:checked + .slider {
+        background-color: #4caf50;
+      }
+      input:checked + .slider:before {
+        transform: translateX(26px);
+      }
+      .toggle-label {
+        font-weight: bold;
+        flex-shrink: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>KulaMind Transcribe API Demo</h1>
+
+    <div class="toggle-container">
+      <div
+        style="
+          display: flex;
+          width: 100%;
+          align-items: center;
+          margin-bottom: 10px;
+        "
+      >
+        <span class="toggle-label" style="margin-right: 10px">Base URL:</span>
+        <input
+          type="text"
+          id="baseUrlInput"
+          style="flex-grow: 1"
+          placeholder="Enter base URL"
+          value=""
+        />
+      </div>
+
+      <div style="display: flex; align-items: center">
+        <span class="toggle-label">Enable Speaker Diarization:</span>
+        <label class="switch">
+          <input type="checkbox" id="diarizationToggle" />
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <!-- File Upload Test -->
+    <div class="test-section">
+      <h2>Demo 1: Upload Audio File</h2>
+      <form id="fileUploadForm">
+        <input type="file" id="audioFile" accept="audio/*" />
+        <button type="submit">Upload</button>
+      </form>
+      <div id="fileUploadStatus"></div>
+      <textarea
+        class="response-area"
+        id="fileUploadResponse"
+        readonly
+        placeholder="Response will appear here..."
+      ></textarea>
+    </div>
+
+    <!-- URL Test -->
+    <div class="test-section">
+      <h2>Demo 2: Transcribe from URL</h2>
+      <input type="text" id="audioUrl" placeholder="Enter audio URL" />
+      <button id="urlSubmitBtn">Submit</button>
+      <div id="urlStatus"></div>
+      <textarea
+        class="response-area"
+        id="urlResponse"
+        readonly
+        placeholder="Response will appear here..."
+      ></textarea>
+    </div>
+
+    <!-- Microphone Streaming Test -->
+    <div class="test-section">
+      <h2>Demo 3: Live Microphone Streaming</h2>
+      <button id="recordBtn">Start Recording</button>
+      <div id="micStatus"></div>
+      <textarea
+        class="response-area"
+        id="streamResponse"
+        readonly
+        placeholder="Live transcription will appear here..."
+      ></textarea>
+    </div>
+
+    <script>
+      let diarizationEnabled = false;
+      // Set default base URL to current origin
+      let baseUrl = window.location.origin;
+
+      // Initialize the base URL input with the default value
+      document.getElementById("baseUrlInput").value = baseUrl;
+
+      // Add event listener for the base URL input
+      document
+        .getElementById("baseUrlInput")
+        .addEventListener("change", function () {
+          baseUrl = this.value.trim();
+          console.log("Base URL set to:", baseUrl);
+        });
+
+      // Add event listener for the diarization toggle
+      document
+        .getElementById("diarizationToggle")
+        .addEventListener("change", function () {
+          diarizationEnabled = this.checked;
+          console.log("Diarization set to:", diarizationEnabled);
+        });
+
+      // File Upload Test
+      document
+        .getElementById("fileUploadForm")
+        .addEventListener("submit", async function (e) {
+          e.preventDefault();
+          const fileInput = document.getElementById("audioFile");
+          const statusDiv = document.getElementById("fileUploadStatus");
+          const responseArea = document.getElementById("fileUploadResponse");
+
+          if (!fileInput.files[0]) {
+            statusDiv.textContent = "Please select a file";
+            return;
+          }
+
+          const formData = new FormData();
+          formData.append("file", fileInput.files[0]);
+          formData.append("batch_size", "1");
+          formData.append("compression_ratio_threshold", "2.4");
+          formData.append("condition_on_previous_text", "true");
+          formData.append("diarization", diarizationEnabled.toString());
+          formData.append("internal_vad", "false");
+          formData.append("log_prob_threshold", "-1");
+          formData.append("multi_channel", "false");
+          formData.append("no_speech_threshold", "0.6");
+          formData.append("num_speakers", "-1");
+          formData.append("repetition_penalty", "1.2");
+          formData.append("source_lang", "en");
+          formData.append("timestamps", "s");
+          formData.append("word_timestamps", "false");
+
+          statusDiv.textContent = "Uploading...";
+
+          try {
+            const response = await fetch(`${baseUrl}/api/v1/audio`, {
+              method: "POST",
+              body: formData,
+            });
+
+            const data = await response.json();
+            responseArea.value = JSON.stringify(data.utterances, null, 2);
+            statusDiv.textContent = response.ok
+              ? "Upload successful"
+              : "Upload failed";
+          } catch (error) {
+            statusDiv.textContent = "Error: " + error.message;
+            responseArea.value = "Error occurred during upload";
+          }
+        });
+
+      // URL Test
+      document
+        .getElementById("urlSubmitBtn")
+        .addEventListener("click", async function () {
+          const urlInput = document.getElementById("audioUrl");
+          const statusDiv = document.getElementById("urlStatus");
+          const responseArea = document.getElementById("urlResponse");
+
+          if (!urlInput.value) {
+            statusDiv.textContent = "Please enter a URL";
+            return;
+          }
+
+          statusDiv.textContent = "Processing...";
+
+          try {
+            const response = await fetch(
+              `${baseUrl}/api/v1/audio-url?url=${encodeURIComponent(
+                urlInput.value
+              )}`,
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  batch_size: 1,
+                  compression_ratio_threshold: 2.4,
+                  condition_on_previous_text: true,
+                  diarization: diarizationEnabled,
+                  internal_vad: false,
+                  log_prob_threshold: -1,
+                  multi_channel: false,
+                  no_speech_threshold: 0.6,
+                  num_speakers: -1,
+                  repetition_penalty: 1.2,
+                  source_lang: "en",
+                  timestamps: "s",
+                  word_timestamps: false,
+                }),
+              }
+            );
+
+            const data = await response.json();
+            responseArea.value = JSON.stringify(data.utterances, null, 2);
+            statusDiv.textContent = response.ok
+              ? "Processing successful"
+              : "Processing failed";
+          } catch (error) {
+            statusDiv.textContent = "Error: " + error.message;
+            responseArea.value = "Error occurred during processing";
+          }
+        });
+
+      // Microphone Streaming Test
+      let isRecording = false;
+      let transcribedText = "";
+      let mediaRecorder;
+      let audioContext;
+      let websocket;
+      const recordBtn = document.getElementById("recordBtn");
+      const micStatusDiv = document.getElementById("micStatus");
+      const streamResponseArea = document.getElementById("streamResponse");
+
+      recordBtn.addEventListener("click", async function () {
+        if (!isRecording) {
+          try {
+            // Start recording
+            await startRecording();
+            isRecording = true;
+            recordBtn.textContent = "Stop Recording";
+            recordBtn.classList.add("recording");
+            micStatusDiv.textContent = "Recording... Streaming audio to server";
+          } catch (error) {
+            micStatusDiv.textContent =
+              "Error starting recording: " + error.message;
+          }
+        } else {
+          // Stop recording
+          stopRecording();
+          isRecording = false;
+          recordBtn.textContent = "Start Recording";
+          recordBtn.classList.remove("recording");
+          micStatusDiv.textContent = "Recording stopped";
+        }
+      });
+
+      async function startRecording() {
+        // Initialize WebSocket
+        websocket = new WebSocket(`${baseUrl}/api/v1/live?source_lang=en`);
+
+        websocket.onopen = () => {
+          micStatusDiv.textContent = "WebSocket connection established";
+          transcribedText = "";
+        };
+
+        websocket.onmessage = (event) => {
+          try {
+            const jsonData = JSON.parse(event.data);
+            transcribedText += jsonData.text;
+            streamResponseArea.value = transcribedText;
+          } catch (e) {
+            console.error("Error parsing WebSocket message:", e);
+          }
+        };
+
+        websocket.onerror = (error) => {
+          micStatusDiv.textContent = "WebSocket error: " + error.message;
+        };
+
+        websocket.onclose = () => {
+          micStatusDiv.textContent = "WebSocket connection closed";
+        };
+
+        // Get microphone access
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+        });
+
+        // Set up audio context
+        audioContext = new AudioContext({
+          sampleRate: 16000,
+          latencyHint: "interactive",
+        });
+        const microphone = audioContext.createMediaStreamSource(stream);
+        const processor = audioContext.createScriptProcessor(4096, 1, 1);
+
+        // Connect the nodes
+        microphone.connect(processor);
+        processor.connect(audioContext.destination);
+
+        // Process audio data
+        processor.onaudioprocess = function (e) {
+          if (websocket.readyState === WebSocket.OPEN) {
+            // Get the raw audio data
+            const inputBuffer = e.inputBuffer;
+            const inputData = inputBuffer.getChannelData(0);
+
+            // Convert to 16-bit PCM
+            const pcmData = new Int16Array(inputData.length);
+            for (let i = 0; i < inputData.length; i++) {
+              pcmData[i] = Math.max(-1, Math.min(1, inputData[i])) * 0x7fff;
+            }
+
+            // Send the audio data as binary
+            websocket.send(pcmData.buffer);
+          }
+        };
+
+        // Store the recorder for later use
+        mediaRecorder = {
+          stream,
+          processor,
+          microphone,
+        };
+      }
+
+      function stopRecording() {
+        if (mediaRecorder) {
+          // Disconnect audio nodes
+          mediaRecorder.microphone.disconnect();
+          mediaRecorder.processor.disconnect();
+
+          // Stop all audio tracks
+          mediaRecorder.stream.getTracks().forEach((track) => track.stop());
+
+          // Close WebSocket
+          if (websocket && websocket.readyState === WebSocket.OPEN) {
+            websocket.close();
+          }
+
+          // Close audio context
+          if (audioContext) {
+            audioContext.close();
+          }
+
+          mediaRecorder = null;
+        }
+      }
+
+      // Clean up on page unload
+      window.addEventListener("beforeunload", function () {
+        if (isRecording) {
+          stopRecording();
+        }
+      });
+    </script>
+  </body>
+</html>

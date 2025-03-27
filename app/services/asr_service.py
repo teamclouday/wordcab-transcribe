@@ -985,6 +985,7 @@ class ASRLiveService(ASRService):
                 source_lang=source_lang,
                 model_index=gpu_index,
             ):
+                logger.debug(f"Transcribed segment: {result}")
                 yield result
 
         except Exception as e:

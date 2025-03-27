@@ -19,6 +19,7 @@
 # and limitations under the License.
 """Transcribe Service for audio files."""
 
+import dataclasses
 from collections.abc import AsyncGenerator, Iterable
 from typing import NamedTuple
 
@@ -194,7 +195,6 @@ class TranscribeService:
                         "min_speech_duration_ms": 250,
                         "min_silence_duration_ms": 100,
                         "speech_pad_ms": 30,
-                        "window_size_samples": 512,
                     },
                 )
             elif self.model_engine == "faster-whisper-batched":
@@ -272,11 +272,20 @@ class TranscribeService:
             audio.numpy(),
             language=source_lang,
             suppress_blank=True,
-            word_timestamps=False,
+            vad_filter=True,
+            beam_size=5,
+            word_timestamps=True,
+            condition_on_previous_text=True,
+            vad_parameters={
+                "threshold": 0.5,
+                "min_speech_duration_ms": 250,
+                "min_silence_duration_ms": 100,
+                "speech_pad_ms": 30,
+            },
         )
 
         for segment in segments:
-            yield segment._asdict()
+            yield dataclasses.asdict(segment)
 
     def multi_channel(  # noqa: PLR0913
         self,
@@ -353,7 +362,6 @@ class TranscribeService:
                         "min_speech_duration_ms": 250,
                         "min_silence_duration_ms": 100,
                         "speech_pad_ms": 30,
-                        "window_size_samples": 512,
                     },
                 )
 
