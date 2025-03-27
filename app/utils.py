@@ -604,7 +604,7 @@ def read_audio(
         wav, sr = torchaudio.load(audio)
     elif isinstance(audio, bytes):
         with io.BytesIO(audio) as buffer:
-            wav, sr = sf.read(buffer, format="RAW", channels=1, samplerate=16000, subtype="PCM_16")
+            wav, sr = sf.read(buffer, format="RAW", channels=1, samplerate=16000, subtype="PCM_16", dtype="float32")
         wav = torch.from_numpy(wav).unsqueeze(0)
     else:
         raise TypeError(f"Invalid audio type. Must be either str or bytes, got: {type(audio)}.")  # noqa: TRY003 EM102

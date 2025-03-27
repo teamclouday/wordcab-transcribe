@@ -58,7 +58,7 @@ class Settings:
     # Post-processing
     enable_punctuation_based_alignment: bool
     # ASR type configuration
-    asr_type: Literal["async", "live", "only_transcription", "only_diarization"]
+    asr_type: Literal["async", "only_transcription", "only_diarization"]
     # API authentication configuration
     username: str
     password: str

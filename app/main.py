@@ -22,6 +22,7 @@
 
 from fastapi import Depends, FastAPI
 from fastapi import status as http_status
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 
 from app.config import settings
@@ -44,6 +45,13 @@ app = FastAPI(
 
 # Add logging middleware
 app.add_middleware(LoggingMiddleware, debug_mode=settings.debug)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Include the appropriate routers based on the settings
 if settings.debug is False:

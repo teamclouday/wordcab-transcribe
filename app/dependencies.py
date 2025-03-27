@@ -37,13 +37,12 @@ from app.services.asr_service import (
 from app.utils import check_ffmpeg, download_model
 
 # Define the ASR service to use depending on the settings
-if settings.asr_type == "live":
-    asr = ASRLiveService(
-        whisper_model=settings.whisper_model,
-        compute_type=settings.compute_type,
-        debug_mode=settings.debug,
-    )
-elif settings.asr_type == "async":
+asr_live = ASRLiveService(
+    whisper_model=settings.whisper_model,
+    compute_type=settings.compute_type,
+    debug_mode=settings.debug,
+)
+if settings.asr_type == "async":
     asr = ASRAsyncService(
         whisper_model=settings.whisper_model,
         compute_type=settings.compute_type,

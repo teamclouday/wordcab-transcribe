@@ -40,10 +40,9 @@ transcribe_routers = (transcribe_router, "/transcribe", "transcription")
 diarize_routers = (diarize_router, "/diarize", "diarization")
 
 routers = []
+routers.append(live_routers)
 if settings.asr_type == "async":
     routers.extend(async_routers)
-elif settings.asr_type == "live":
-    routers.append(live_routers)
 elif settings.asr_type == "only_transcription":
     routers.append(transcribe_routers)
 elif settings.asr_type == "only_diarization":
