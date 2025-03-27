@@ -159,13 +159,17 @@ class PostProcessingService:
 
             if segment_end > float(end) and abs(segment_end - float(end)) > threshold:
                 words = segment.words
-                word_index = next(
-                    (
-                        i
-                        for i, word in enumerate(words)
-                        if word.start > float(end) or abs(word.start - float(end)) < threshold
-                    ),
-                    None,
+                word_index = (
+                    next(
+                        (
+                            i
+                            for i, word in enumerate(words)
+                            if word.start > float(end) or abs(word.start - float(end)) < threshold
+                        ),
+                        None,
+                    )
+                    if words is not None
+                    else None
                 )
 
                 if word_index is not None:

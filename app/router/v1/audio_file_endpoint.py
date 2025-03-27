@@ -45,7 +45,7 @@ router = APIRouter()
 async def inference_with_audio(  # noqa: PLR0913
     background_tasks: BackgroundTasks,
     file: Annotated[UploadFile, File(...)],
-    batch_size: Annotated[int | None, Form()] = None,
+    batch_size: Annotated[int, Form()] = 1,
     offset_start: Annotated[float | None, Form()] = None,
     offset_end: Annotated[float | None, Form()] = None,
     num_speakers: Annotated[int, Form()] = -1,
@@ -79,6 +79,7 @@ async def inference_with_audio(  # noqa: PLR0913
     try:
         filepath: str | list[str] = await process_audio_file(filename, num_channels=num_channels)
     except Exception as e:
+        logger.exception(e)
         try:
             background_tasks.add_task(delete_file, filepath=filename)
             background_tasks.add_task(delete_file, filepath=filepath)
@@ -144,14 +145,14 @@ async def inference_with_audio(  # noqa: PLR0913
         )
 
     utterances, process_times, audio_duration = result
-    return AudioResponse(
+    result = AudioResponse(
         utterances=utterances,
         audio_duration=audio_duration,
         offset_start=data.offset_start,
         offset_end=data.offset_end,
         num_speakers=data.num_speakers,
         diarization=data.diarization,
-        batch_size=batch_size,
+        batch_size=data.batch_size,
         multi_channel=data.multi_channel,
         source_lang=data.source_lang,
         timestamps=data.timestamps,
@@ -165,3 +166,8 @@ async def inference_with_audio(  # noqa: PLR0913
         condition_on_previous_text=data.condition_on_previous_text,
         process_times=process_times,
     )
+
+    if settings.debug:
+        logger.debug(f"Result: {result.model_dump()}")
+
+    return result
