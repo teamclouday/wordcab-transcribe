@@ -63,9 +63,6 @@ class Settings:
     openssl_key: str
     openssl_algorithm: str
     access_token_expire_minutes: int
-    # Remote servers configuration
-    transcribe_server_urls: list[str] | None
-    diarize_server_urls: list[str] | None
 
     @field_validator("project_name")
     @classmethod
@@ -258,19 +255,6 @@ if _multiscale_weights is not None:
 else:
     multiscale_weights = [1.0, 1.0, 1.0, 1.0, 1.0]
 
-# Multi-servers configuration
-_transcribe_server_urls = getenv("TRANSCRIBE_SERVER_URLS", None)
-if _transcribe_server_urls is not None and _transcribe_server_urls != "":
-    transcribe_server_urls = [url.strip() for url in _transcribe_server_urls.split(",")]
-else:
-    transcribe_server_urls = None
-
-_diarize_server_urls = getenv("DIARIZE_SERVER_URLS", None)
-if _diarize_server_urls is not None and _diarize_server_urls != "":
-    diarize_server_urls = [url.strip() for url in _diarize_server_urls.split(",")]
-else:
-    diarize_server_urls = None
-
 settings = Settings(
     # General configuration
     project_name=getenv("PROJECT_NAME", "Wordcab Transcribe"),
@@ -304,7 +288,4 @@ settings = Settings(
     openssl_key=getenv("OPENSSL_KEY", "0123456789abcdefghijklmnopqrstuvwyz"),
     openssl_algorithm=getenv("OPENSSL_ALGORITHM", "HS256"),
     access_token_expire_minutes=int(getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30")),
-    # Remote servers configuration
-    transcribe_server_urls=transcribe_server_urls,
-    diarize_server_urls=diarize_server_urls,
 )

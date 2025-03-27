@@ -254,8 +254,6 @@ class ASRAsyncService(ASRService):
         multiscale_weights: list[float],
         extra_languages: list[str] | None,
         extra_languages_model_paths: list[str] | None,
-        transcribe_server_urls: list[str] | None,
-        diarize_server_urls: list[str] | None,
         debug_mode: bool,
     ) -> None:
         """
@@ -276,12 +274,6 @@ class ASRAsyncService(ASRService):
                 The list of extra languages to support.
             extra_languages_model_paths (Union[List[str], None]):
                 The list of paths to the extra language models.
-            use_remote_servers (bool):
-                Whether to use remote servers for transcription and diarization.
-            transcribe_server_urls (Union[List[str], None]):
-                The list of URLs to the remote transcription servers.
-            diarize_server_urls (Union[List[str], None]):
-                The list of URLs to the remote diarization servers.
             debug_mode (bool):
                 Whether to run in debug mode.
         """
@@ -306,25 +298,8 @@ class ASRAsyncService(ASRService):
             "temperature": 0.0,
         }
 
-        if transcribe_server_urls is not None:
-            logger.info("You provided URLs for remote transcription server, no local model will be used.")
-            self.remote_services.transcription = RemoteServiceConfig(
-                use_remote=True,
-                url_handler=URLService(remote_urls=transcribe_server_urls),
-            )
-        else:
-            logger.info("You did not provide URLs for remote transcription server, local model will be used.")
-            self.create_transcription_local_service()
-
-        if diarize_server_urls is not None:
-            logger.info("You provided URLs for remote diarization server, no local model will be used.")
-            self.remote_services.diarization = RemoteServiceConfig(
-                use_remote=True,
-                url_handler=URLService(remote_urls=diarize_server_urls),
-            )
-        else:
-            logger.info("You did not provide URLs for remote diarization server, local model will be used.")
-            self.create_diarization_local_service()
+        self.create_transcription_local_service()
+        self.create_diarization_local_service()
 
         self.debug_mode = debug_mode
 
