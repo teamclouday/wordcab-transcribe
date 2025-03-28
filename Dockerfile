@@ -13,7 +13,8 @@ ENV PYTHONUNBUFFERED=1 \
     POETRY_NO_INTERACTION=1 \
     POETRY_VIRTUALENVS_CREATE=false \
     VIRTUAL_ENV="/venv" \
-    DEBIAN_FRONTEND=noninteractive
+    DEBIAN_FRONTEND=noninteractive \
+    LD_LIBRARY_PATH="/usr/local/cuda/lib64:/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH"
 
 # Install Python and required build tools
 RUN apt-get update && \
@@ -28,6 +29,7 @@ RUN apt-get update && \
     python3-pip \
     build-essential \
     curl \
+    ffmpeg \
     && apt-get clean
 
 # Create symlinks for python
@@ -60,7 +62,7 @@ COPY poetry.lock pyproject.toml ./
 
 # Install runtime dependencies with caching
 RUN --mount=type=cache,target=/root/.cache/pip \
-    poetry lock && poetry install --no-root --only main
+    poetry install --no-root --only main
 
 ################################
 # PRODUCTION
