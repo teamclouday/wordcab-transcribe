@@ -234,6 +234,7 @@ class TranscribeService:
         self,
         audio: torch.Tensor,
         source_lang: str,
+        initial_prompt: str,
         model_index: int,
     ) -> AsyncGenerator[dict]:
         """Async generator for live transcriptions.
@@ -248,13 +249,14 @@ class TranscribeService:
         Yields:
             Iterable[dict]: Iterable of transcribed segments.
         """
-        for result in self.live_transcribe(audio, source_lang, model_index):
+        for result in self.live_transcribe(audio, source_lang, initial_prompt, model_index):
             yield result
 
     def live_transcribe(
         self,
         audio: torch.Tensor,
         source_lang: str,
+        initial_prompt: str,
         _model_index: int,
     ) -> Iterable[dict]:
         """
@@ -276,6 +278,7 @@ class TranscribeService:
             beam_size=5,
             word_timestamps=True,
             condition_on_previous_text=True,
+            initial_prompt=initial_prompt,
             vad_parameters={
                 "threshold": 0.5,
                 "min_speech_duration_ms": 250,

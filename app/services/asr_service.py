@@ -951,6 +951,7 @@ class ASRLiveService(ASRService):
             device_index=self.device_index,
         )
         self.debug_mode = debug_mode
+        self.previous_text: dict[str, str] = {}
 
     async def inference_warmup(self) -> None:
         """Warmup the GPU by loading the models."""
@@ -962,7 +963,7 @@ class ASRLiveService(ASRService):
             ):
                 pass
 
-    async def process_input(self, data: bytes, source_lang: str) -> AsyncGenerator[dict]:
+    async def process_input(self, sid: str, data: bytes, source_lang: str) -> AsyncGenerator[dict]:
         """
         Process the input data and return the results as a tuple of text and duration.
 
@@ -979,12 +980,18 @@ class ASRLiveService(ASRService):
 
         try:
             waveform, _ = read_audio(data)
+            previous = self.previous_text.get(sid, "")
 
             async for result in self.transcription_service.async_live_transcribe(
                 audio=waveform,
                 source_lang=source_lang,
+                initial_prompt=previous,
                 model_index=gpu_index,
             ):
+                previous += result.get("text", "")
+                # keep the previous 10 words
+                self.previous_text[sid] = " ".join(previous.split()[-10:])
+
                 logger.debug(f"Transcribed segment: {result}")
                 yield result
 
@@ -993,6 +1000,9 @@ class ASRLiveService(ASRService):
 
         finally:
             self.gpu_handler.release_device(gpu_index)
+
+    def clean_up_states(self, sid: str) -> None:
+        self.previous_text.pop(sid, None)
 
 
 class ASRTranscriptionOnly(ASRService):

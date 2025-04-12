@@ -19,11 +19,15 @@
 # and limitations under the License.
 """Live endpoints for the Wordcab Transcribe API."""
 
+import shortuuid
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from app.dependencies import asr_live
 
 router = APIRouter()
+
+BUFFER_SIZE = 4096 * 4
+BUFFER_OVERLAP_SIZE = 1024
 
 
 class ConnectionManager:
@@ -31,20 +35,23 @@ class ConnectionManager:
 
     def __init__(self) -> None:
         """Initialize the connection manager."""
-        self.active_connections: list[WebSocket] = []
+        self.active_connections: dict[str, WebSocket] = {}
+        self.audio_buffers: dict[str, bytes] = {}
 
-    async def connect(self, websocket: WebSocket) -> None:
+    async def connect(self, sid: str, websocket: WebSocket) -> None:
         """Connect a WebSocket."""
         if len(self.active_connections) > 1:
             await websocket.close(code=1001, reason="Too many connections, try again later.")
 
         else:
             await websocket.accept()
-            self.active_connections.append(websocket)
+            self.active_connections[sid] = websocket
+            self.audio_buffers[sid] = b""
 
-    def disconnect(self, websocket: WebSocket) -> None:
+    def disconnect(self, sid: str) -> None:
         """Disconnect a WebSocket."""
-        self.active_connections.remove(websocket)
+        self.active_connections.pop(sid, None)
+        self.audio_buffers.pop(sid, None)
 
 
 manager = ConnectionManager()
@@ -53,15 +60,26 @@ manager = ConnectionManager()
 @router.websocket("")
 async def websocket_endpoint(source_lang: str, websocket: WebSocket) -> None:
     """Handle WebSocket connections."""
-    await manager.connect(websocket)
+    sid = shortuuid.uuid()
+    await manager.connect(sid, websocket)
 
     try:
         while True:
             data = await websocket.receive_bytes()
 
-            async for result in asr_live.process_input(data=data, source_lang=source_lang):
-                await websocket.send_json(result)
-                del result
+            manager.audio_buffers[sid] += data
+
+            if len(manager.audio_buffers[sid]) > BUFFER_SIZE:
+                data_to_process = manager.audio_buffers[sid]
+                # keep some overlap for context
+                manager.audio_buffers[sid] = data_to_process[-BUFFER_OVERLAP_SIZE:]
+
+                async for result in asr_live.process_input(sid=sid, data=data_to_process, source_lang=source_lang):
+                    await websocket.send_json(result)
+                    del result
 
     except WebSocketDisconnect:
-        manager.disconnect(websocket)
+        manager.disconnect(sid)
+
+    finally:
+        asr_live.clean_up_states(sid)

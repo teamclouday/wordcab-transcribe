@@ -45,7 +45,7 @@ class LongFormDiarizeService:
     def __init__(
         self,
         device: str,
-        domain: str = "telephonic",
+        domain: str = "general",
     ) -> None:
         """
         Initialize the DiarizeService.
